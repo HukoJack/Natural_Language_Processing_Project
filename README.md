@@ -1,4 +1,2 @@
-Natural_Language_Processing_Project
-===================================
+# Under Construction
 
-Word prediction for twitter, news, and blogs texts
