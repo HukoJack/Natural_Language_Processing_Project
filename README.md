@@ -8,18 +8,28 @@ Around the world, people are spending an increasing amount of time on their mobi
 I went to the 
 the keyboard presents three options for what the next word might be. For example, the three words might be gym, store, restaurant. In this capstone we will work on understanding and building predictive text models, and we will develop a presentational Web App for our model built. 
 
-The capstone consists of three deliverable components: 
+The capstone consists of three deliverable components:
+
 1. A predictive text model
 2. A reproducible R markdown document describing model building process
 3. A data product built with Shiny to demonstrate the use of the product 
 
 ## Data
 
-The dataset can be downloaded here:
+The dataset provided by Coursera can be downloaded here:
 
 [Dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)
 
-The files in the dataset named LOCALE.blogs.txt where LOCALE is the each of the four locales en_US, de_DE, ru_RU and fi_FI. For our tasks we will use English LOCALE only. The data is from a corpus called [HC Corpora](www.corpora.heliohost.org). For more details see the [README file](http://www.corpora.heliohost.org/aboutcorpus.html). The files have been language filtered but may still contain some foreign text.
+The files in the dataset named LOCALE.blogs.txt where LOCALE is the each of the four locales en_US, de_DE, ru_RU and fi_FI. For our tasks we will use English LOCALE only. The data is from a corpus called [HC Corpora](http://www.corpora.heliohost.org). For more details see the [README file](http://www.corpora.heliohost.org/aboutcorpus.html). The files have been language filtered but may still contain some foreign text.
 Note that the raw data contain words of offensive and profane meaning.
 
 ## Results
+
+The first brief report about available data:
+[First report](http://htmlpreview.github.io/?https://github.com/HukoJack/Natural_Language_Processing_Project/blob/master/milestone_report.html)
+
+Reproducible R markdown document describing model building and testing process:
+under construction
+
+Demonstrational Web App:
+under construction
