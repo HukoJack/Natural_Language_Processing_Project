@@ -1,11 +1,13 @@
-# Building a Predictive Text Model for Twitter, News, and Blogs Word Prediction
+# Building a Predictive Text Model for Words Prediction of Twitter, News, and Blogs Texts 
 
 This is an educational Capstone Project, which is the part of [Data Science Specialization](https://www.coursera.org/specialization/jhudatascience/1?utm_medium=listingPage) provided by Johns Hopkins University on Coursera. 
 
 ## Introduction
 
 Around the world, people are spending an increasing amount of time on their mobile devices for email, social networking, banking and a whole range of other activities. But typing on mobile devices can be a serious pain. Smart keyboard can make it easier for people to type on their mobile devices. One cornerstone of a smart keyboard is predictive text models. When someone types: 
-I went to the 
+
+"I went to the" 
+
 the keyboard presents three options for what the next word might be. For example, the three words might be gym, store, restaurant. In this capstone we will work on understanding and building predictive text models, and we will develop a presentational Web App for our model built. 
 
 The capstone consists of three deliverable components:
@@ -16,7 +18,7 @@ The capstone consists of three deliverable components:
 
 ## Data
 
-The dataset provided by Coursera can be downloaded here:
+The dataset provided by [Coursera](https://www.coursera.org/) can be downloaded here:
 
 [Dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)
 
@@ -25,10 +27,10 @@ Note that the raw data contain words of offensive and profane meaning.
 
 ## Results
 
-Reproducible R markdown document describing model building and testing process:
+You can explore reproducible R markdown document describing model building and testing process here:
 
-under construction
+[Report](http://htmlpreview.github.io/?https://github.com/HukoJack/Natural_Language_Processing_Project/blob/master/Report.html)
 
-Demonstrational Web App:
+You can have access to demonstrational Web application here:
 
 under construction
