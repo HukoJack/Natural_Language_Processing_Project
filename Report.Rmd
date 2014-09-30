@@ -1,0 +1,989 @@
+---
+title: "Building a Predictive Text Model for Twitter, News, and Blogs Word Prediction"
+output: html_document
+---
+
+## Synopsis
+
+
+
+## Data
+
+```{r status_check, echo=FALSE}
+# This code checks if the current working directory contains any of the
+# output files produced by this script. If it successfully finds any, it will start 
+# analysis from the corresponding checkpoint
+
+status <- c(file.exists("Coursera-SwiftKey.zip"),
+            all(file.exists("en_US.blogs.txt", "en_US.news.txt", "en_US.twitter.txt")),
+            all(file.exists("gram1.twitter.counts", "gram2.twitter.counts", 
+                            "gram3.twitter.counts", "gram4.twitter.counts", 
+                            "gram1.blogs.counts", "gram2.blogs.counts", 
+                            "gram3.blogs.counts", "gram4.blogs.counts", 
+                            "gram1.news.counts", "gram2.news.counts", 
+                            "gram3.news.counts", "gram4.news.counts")),
+            all(file.exists("twitter.model", "blogs.model")))#, "news.model")))
+
+```
+
+### Data source
+
+The data for this project is from [HC Corpora](www.corpora.heliohost.org). The 
+particular dataset that was used for analysis was provided by 
+[Coursera](https://www.coursera.org/) and can be downloaded here:
+
+[Coursera-SwiftKey.zip](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)
+
+Zip archive contains files in format LOCALE.blogs.txt where LOCALE is the each 
+of the four locales en_US, de_DE, ru_RU and fi_FI. We will use only English
+corpora in this project, which consists of three files "en_US.twitter.txt",  
+"en_US.blogs.txt", and "en_US.news.txt". As it mentioned in names of the files, 
+they contain raw textual data from twitter, blogs and news respectively. The 
+files also might contain some foreign text and words of offensive and profane 
+meaning. Here is basic information about size and counts of lines, words, and symbols
+for each file:
+
+```{r info, echo=FALSE}
+info <- data.frame(row.names=c("en_US.blogs.txt", "en_US.news.txt", "en_US.twitter.txt"), 
+                   line_counts=c(899288, 1010242, 2360148), 
+                   word_counts=c(37334131, 34372530, 30373583), 
+                   sizeMb=c(210160014 / (1024 ** 2), 
+                            205811889 / (1024 ** 2), 
+                            167105338 / (1024 ** 2)))
+info
+```
+
+Additional description for this dataset is available in HC Corpora [ReadMe](http://www.corpora.heliohost.org/aboutcorpus.html).
+
+### Data processing
+
+```{r download, echo=FALSE}
+if (!any(status)) {
+    download.file("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip", "Coursera-SwiftKey.zip", mode="wb")
+   unzip("Coursera-SwiftKey.zip", junkpaths=TRUE, 
+         files=c("final/en_US/en_US.twitter.txt", 
+                 "final/en_US/en_US.news.txt", 
+                 "final/en_US/en_US.blogs.txt"))
+}
+```
+
+After downloading, lines 77259, 776277, 926143, 948564 were manually removed 
+from "en_US.news.txt" file dew to the special character SUB (Ctrl+Z) in them. This
+character causes termination of the data reading process for the "readLines" function
+in R.
+
+The data in each file was separated into two parts. First part, which consisted of
+roughly 80% of data, was used as training set for n-gram counts generation and in
+building of the predictive model for the word prediction task. The rest of the data was
+used as a test set for the model performance evaluation. Here is data distribution for 
+all three files:
+
+1. en_US.twitter.txt - 2,000,000 lines in training set, 360,148 lines in test set
+2. en_US.blogs.txt - 750,000 lines in training set, 149,288 lines in test set
+3. en_US.news.txt - 800,000 lines in training set, 210,238 lines in test set
+
+#### Data Cleaning
+
+The raw data contains upper-case letters, punctuation marks, textual emotion 
+expressions (different kinds of smiles), digits, e-mails, hashtags, offensive 
+and profane words, duplicated symbols, and some other special symbols that should be 
+handled before further processing. It is expected that data from Twitter have 
+much more issues like these. Dew to this fact, twitter predictive model also might 
+have worse performance than other models, while data from blogs and news has been written 
+in much more clear way. Libraries "tm" and "stringi" were used for data cleaning. 
+At the first step of cleaning process all documents in corpus were transformed to the
+lower case. After that symbols ">" and "<" were removed, which might be useful later 
+as special tags. At the next step all digits and combinations
+of digits where digits separated with one of special symbols (":,.-") were replaced with
+tag "\<digit\>", because an exact value of them can't be useful in prediction model.
+Also all e-mails were replaced with tag "\<e-mail\>" for the same reasons. After that
+some smiles like ":-P" that might produce single letter token after the special symbols
+deletion were removed.
+
+Another important procedure in data cleaning process is handling of punctuation marks
+and other special symbols that might be meaningful. For instance, we can't just
+remove symbols like "-" and different kinds of apostrophes, because they play
+important role in some combined words like "I'm", "don't", "e-mail", etc. Also we
+can't remove all meaningful punctuation marks (",.?!"), which might cause full chaos 
+in corpus and produce n-grams that normally do not appear in sentence. Before handling 
+punctuations, symbol ";" was replaced with "," dew to the close meaning. We decided to left
+punctuation marks ",.?!" and treat them like separate words in our 
+prediction model, because in this case they can be used for punctuation prediction, 
+while they can be easily filtered when there is no need in them.
+After handling these special symbols all other symbols ")(:#%$^\\~}&+=@/"_]+"
+were removed.
+
+We did not remove hashtags but only hashtag symbols, because they usually are meaningful.
+Also we decided not to remove stop words from corpus. For more convenience all 
+the cleaning procedures described above were placed into one function, that was 
+used in data parser later:
+
+```{r cleaning}
+cleanCorpus <- function(corpus) {
+    # Makes some cleaning and symbol handling procedures for tm corpus of textdata
+    library(tm)
+    library(stringi)
+    # Case correction
+    corpus  <- tm_map(corpus, function(x) stri_trans_tolower(x[[1]]))
+    # Remove tags
+    corpus  <- tm_map(corpus, function (x) gsub("[<>]", "", x[[1]]))
+    # digits replacement
+    corpus  <- tm_map(corpus, function (x) gsub("[[:digit:]]+[:.,-][[:digit:]]+", " <digit> ", x[[1]]))
+    corpus  <- tm_map(corpus, function (x) gsub("[[:digit:]]+", " <digit> ", x[[1]]))
+    # email replacement
+    corpus  <- tm_map(corpus, function (x) gsub("[[:alnum:].-]+@[[:alnum:].-]+", " <e-mail> ", x[[1]]))
+    # remove some smiles that might left standalone alphabetic symbols after deletion
+    for (smile in c("x-p", "o.o", "[-=:;][boqje#pds]", "<3")) {
+        corpus  <- tm_map(corpus, function (x) gsub(smile, "", x[[1]]))
+    }
+    # replace ?!?!?!?! and ;
+    corpus  <- tm_map(corpus, function (x) gsub("\\?+\\!+|\\!+\\?+", "?", x[[1]]))
+    corpus  <- tm_map(corpus, function (x) gsub(";+", ",", x[[1]]))
+    # remove duplicates of important punctuation and add spacing
+    for (punct in c("!", "?", ".", ",")) {
+        pattern <- paste0("\\", punct, "+")
+        replacement <- paste0(" ", punct, " ")
+        corpus  <- tm_map(corpus, function (x) gsub(pattern, replacement, x[[1]]))
+    }
+    # remove other punctuation
+    corpus  <- tm_map(corpus, function (x) gsub('[])(:#%$^\\~{}[&+=@/"_]+', "", x[[1]]))
+    return(corpus)
+}
+```
+
+
+#### Profanity Filtering
+
+Another important task in data cleaning is removing offensive and profane words,
+because we usually do not want to predict them. Just deleting these words might 
+cause some problems with text consistency, so we replaced them with special tag
+"\<badword\>". The universal regular expression for the most common profane words
+was created using freely available [bad-words dictionary](http://urbanoalvarez.es/blog/2008/04/04/bad-words-list/). It was used later in special bad-word handling function: 
+
+```{r badwords}
+badWordHandle <- function(corpus) {
+    # Change most frequent badwords to <badword> tag
+    reg <- " screw | wank[a-z]*|b[o0][o0]bs|l3i[a-z]ch|knob|or[ia]f[ai][cs]|[a-z]damn |d[iy]ck|q[uw]e[ei]r| arse|[ck]awk| gay|retard|s[kc]anc*k|t[ie]+t[sz]|slut|puss[ye]|vul+va|vag*[i1]*j*i*na|pola[ck]|phu[ck]|pe[ie]*n[a1iu]+s|pac*k[iy]| anal | anus |butt[wh-]|clit|crap|pu[tl][eao] |jar*c*k[\\s-]*off|blow\\s*job|ji[zs]+|nazi|w*h[o0]+a*r|a[s]*h[o0]le|sh[i1!y]t|mas+t[eu]*rbai*t|n[i1]+g+[eu]*r| a[sz][sz]|bas+t[ae]rd|b[!i1][a7]*tch|c[o0]ck| cum |[ck]u*nt|dild[a-z]*|f\\s*u\\s*c*\\s*k|fai*g"
+    corpus  <- tm_map(corpus, function (x) gsub(reg, " <badword> ", x[[1]]))
+    return(corpus)
+}
+```
+
+
+#### White-space trim and empty string deletion
+
+At the next step of data processing the white-space correction was performed.
+Firstly, all white-space characters at the beginning and at the end of each
+document should be removed, as well as duplicates of them in text. Secondly,
+empty strings have to be deleted from corpus. Finally, special tag "\<s\>", which means
+start of the document, should be placed at the beginning of each document in a corpus.
+We do this for the reason to be able to predict words at the beginning of the text,
+when there were no words printed yet. All these white-space processing procedures
+were placed into one function, that will be used in parser later:
+
+```{r whitespace}
+whiteSpaceCorrection <- function(corpus) {
+    # Provides end/begin whitespace trimming an removing of whitespace duplicates
+    corpus  <- tm_map(corpus, function (x) gsub("^\\s+|\\s+$", "", x[[1]]))
+    # remove 1+ spaces
+    corpus  <- tm_map(corpus, function (x) gsub("\\s+", " ", x[[1]]))
+    # empty string deletion
+    item_length <- tm_map(corpus, function (x) nchar(x[[1]]))
+    item_length <- unlist(item_length)
+    idx <- item_length == 0
+    corpus <- corpus[!idx]
+    # starting each document with special tag "<s> "
+    corpus  <- tm_map(corpus, function (x) paste("<s>", x[[1]]))
+    return(corpus)
+}
+```
+
+
+### n-gram Counts
+
+After we obtained clean corpus of documents, the next important step in creation of
+data model is word tokenization and n-gram counting. N-grams might be counted by
+making n-gram matrices using standard function from "tm" package. But
+there are some problems with this approach. Firstly, data matrices produced with it
+on natural language are very sparse and mostly consists of zeroes. Secondly, dew 
+to the previous fact, it is quite a slow process. Thirdly, we have reasonable amounts
+of data, and there will be billions of n-grams there. You just can't store such a big 
+matrix in memory. One way to handle this problem is to do not use matrices for 
+counts storing. For model creation we need counts only for n-grams that occurred in
+data and there is no need in all these zeroes in sparse matrix. The better way to
+store counts is a dictionary-like structures, for instance a list or named vector.
+Another problem is in the size of data. Even very simple operations like indexing
+slows down significantly when the size of our n-gram storage increase. To handle this
+problem we decided to use map-reduce approach. The corpus data can be mapped to the
+small chunks very easy, so even without parallel computing this might improve
+performance considerably, at the same time avoiding memory restrictions. At the first 
+stage the whole corpus was mapped to the small chunks and 1, 2, 3 and 4-grams was
+counted. At the next stage all these counts was reduced to the total 1, 2, 3 and 4-grams
+counts.
+
+#### Map Phase
+
+N-grams was counted with this function that takes a small chunk of data as an input
+and writes 1, 2, 3 and 4-grams counts to global storage objects:
+
+```{r ngram_counts}
+n_gramCount <- function (data) {
+    # writes counts of all possible 1, 2, 3 and 4 grams from corpus to 
+    # global ngram storage objects "gram1", "gram2", "gram3", "gram4"
+#     count <<- count + 1
+#     if (count %% 100 == 0) {      # performance testing
+#         print(paste(count, "documents evaluated", date()))
+#     }
+    onegrams <- strsplit(data, split=" ")[[1]]
+    for (index in 1:length(onegrams)) {
+        # 1-gram count
+        word1 <- onegrams[index]
+        value <- gram1[[word1]]
+        if (!is.null(value)) {
+            gram1[[word1]] <<- value + 1
+        } else {
+            gram1[[word1]] <<- 1
+        }
+        # 2-gram count
+        word2 <- onegrams[index + 1]
+        if (!is.na(word2)) {
+            twogram <- paste(word1, word2)
+            value <- gram2[[twogram]]
+            if (!is.null(value)) {
+                gram2[[twogram]] <<- value + 1
+            } else {
+                gram2[[twogram]] <<- 1
+            }
+        }
+        # 3-gram count
+        word3 <- onegrams[index + 2]
+        if (!is.na(word3)) {
+            threegram <- paste(word1, word2, word3)
+            value <- gram3[[threegram]]
+            if (!is.null(value)) {
+                gram3[[threegram]] <<- value + 1
+            } else {
+                gram3[[threegram]] <<- 1
+            }
+        }
+        # 4-gram count
+        word4 <- onegrams[index + 3]
+        if (!is.na(word4)) {
+            fourgram <- paste(word1, word2, word3, word4)
+            value <- gram4[[fourgram]]
+            if (!is.null(value)) {
+                gram4[[fourgram]] <<- value + 1
+            } else {
+                gram4[[fourgram]] <<- 1
+            }
+        }
+    }
+}
+```
+
+Also was created a higher level parser function that takes a name of file, size of
+chunk, starting and end points for data parsing as input. It use previous function
+to count n-grams and store them to hard disk drive into a single file for each chunk.
+
+```{r parser}
+parseData <- function(filename, chunksize=1000, start_from=1, end_at=4000) {
+    # This function takes file with raw data by small chunks and
+    # provides data cleaning, counting n-grams and storing them into files
+    library(tm)
+    con <- file(filename, open="r")
+    num <- 0
+    ngram_list <- grep("ngram", dir(), value=TRUE)
+    if (length(ngram_list) != 0) {
+        last_file_done <- max(as.integer(unlist(sapply(strsplit(ngram_list, split="_"), function (x) {x[2]}))))
+    } else {
+        last_file_done <- 0
+    }
+#     print(paste("Started at", date()))
+    while (length(data <- readLines(con, chunksize, encoding="utf-8", skipNul=TRUE)) > 0 & num < end_at) {
+        if (num + 1 > last_file_done & num + 1 >= start_from) {
+            corpus <- VCorpus(VectorSource(data), readerControl=list(reader=readPlain, language="en"))
+            corpus <- cleanCorpus(corpus)
+            corpus <- badWordHandle(corpus)
+            corpus <- whiteSpaceCorrection(corpus)
+            gram1 <<- list()
+            gram2 <<- list()
+            gram3 <<- list()
+            gram4 <<- list()
+            res <- sapply(corpus, function (x) n_gramCount(x[[1]]))
+            gram1 <<- unlist(gram1)
+            gram2 <<- unlist(gram2)
+            gram3 <<- unlist(gram3)
+            gram4 <<- unlist(gram4)
+            rm(res)
+            save(gram1, gram2, gram3, gram4, file=paste0("ngram_", num+1))
+#             print(paste("Elements from", (num)*chunksize, "to", (num+1)*chunksize, "were evaluated", date()))  # performance testing
+        }
+        num <- num + 1
+    }
+    close(con)
+}
+```
+
+We decided to count n-grams and to create the prediction model for each file 
+separately. There are some reasons for that, and the main is that prediction models are
+good only in context of the data. While we still can use model from blog corpus to
+predict words in context of news, we definitely can't do this for twitter data. They are
+very different and accuracy of this predictive model will be not very high. So we 
+decided to create three different models for each context (news, blogs and twitter).
+
+#### Reduce Phase
+
+In the reduce phase we reduced all the n-grams counts from the all files
+created in the map phase. Three different functions was created in order to perform this.
+The first one splits files with 1, 2, 3 and 4-gram counts into four separate files.
+Second takes two files with n-gram counts of the same rank and merge them together.
+And the third one is a higher level function that goes over all of files with n-gram counts
+and merge them for the given n.
+
+```{r reducers}
+separateNgramFiles <- function(filenames_list) {
+    # Separate composit ngram files to files that contains only one type of ngrams
+    count <- 0
+    for (name in filenames_list) {
+        load(name)
+        save(gram1, file=paste0(name, "_1"))
+        save(gram2, file=paste0(name, "_2"))
+        save(gram3, file=paste0(name, "_3"))
+        save(gram4, file=paste0(name, "_4"))
+        count <- count + 1
+#         if (count %% 10 == 0) {  # performance testing
+#             print(paste(count, "files were processed"))
+#         }
+        file.remove(name)
+    }
+}
+
+
+mergeNgramFiles <- function(a, b) {
+    # merge two n-gram files
+    n <- substr(a, nchar(a), nchar(a))
+    load(a)
+    if (n == 1) {
+        first <- gram1
+        rm(gram1)
+    } else if (n == 2) {
+        first <- gram2
+        rm(gram2)
+    } else if (n == 3) {
+        first <- gram3
+        rm(gram3)
+    } else {
+        first <- gram4
+        rm(gram4)
+    }
+    load(b)
+    if (n == 1) {
+        second <- gram1
+        rm(gram1)
+    } else if (n == 2) {
+        second <- gram2
+        rm(gram2)
+    } else if (n == 3) {
+        second <- gram3
+        rm(gram3)
+    } else {
+        second <- gram4
+        rm(gram4)
+    }
+    unique_names <- unique(c(names(first), names(second)))
+    empty <- integer(length(unique_names))
+    names(empty) <- unique_names
+    ad <- data.frame(empty, empty)
+    ad[names(first), 1] <- first
+    ad[names(second), 2] <- second
+    result <- rowSums(ad)
+    file.remove(a)
+    file.remove(b)
+    if (n == 1) {
+        gram1 <- result
+        rm(result)
+        save(gram1, file=a)
+    } else if (n == 2) {
+        gram2 <- result
+        rm(result)
+        save(gram2, file=a)
+    } else if (n == 3) {
+        gram3 <- result
+        rm(result)
+        save(gram3, file=a)
+    } else {
+        gram4 <- result
+        rm(result)
+        save(gram4, file=a)
+    }
+    
+}
+
+
+mergeAll <- function(n) {
+    # Merge all n-gram files for the given n
+    files <- grep(paste0("ngram_[[:digit:]]+_", n), dir(), value=TRUE)
+    file_info <- file.info(dir())
+    too_big <- file_info$size
+    names(too_big) <- rownames(file_info)
+    too_big <- names(too_big[too_big > 6e7])
+    files <- setdiff(files, too_big)
+    while (length(files) > 1) {
+        files <- grep(paste0("ngram_[[:digit:]]+_", n), dir(), value=TRUE)
+        file_info <- file.info(dir())
+        too_big <- file_info$size
+        names(too_big) <- rownames(file_info)
+        too_big <- names(too_big[too_big > 6e7])
+        files <- setdiff(files, too_big)
+        if (length(files) > 1) {
+            indexes <- seq(from=1, to=length(files)-1, by=2)
+            for (index in indexes) {
+                mergeNgramFiles(files[index], files[index+1])
+            }
+        }
+    }
+}
+```
+
+#### n-gram Counts Optimization
+
+The final aim of this project is a Web App that might be used on mobile gadgets 
+for the next word prediction task and this fact cause some restrictions on our 
+predictive model. It should be reasonably small, do not require a lot of resources, and
+have a high performance, because it should work in real-time manner. One possible way to
+make optimization without affecting accuracy of the model is to delete some very rare n-grams. 
+
+This might also cause some other positive effects. We did not even 
+tried to filter words in corpora in order to find some misspelled
+words, words from other languages, and random sets of symbols like "dadasfga sfghasgdf"
+during the cleaning process. The intuition was that words like these should be very rare in the dataset and after n-gram counting we can just remove n-grams with the lowest counts.
+
+We found that percentage of the most frequent words that cover most n-gram counts differ for different n (here are presented results for a subset of original data):
+
++ roughly top 0.6% 1-grams contain 50% of counts and top 30% 1-grams contain 90% of counts
++ roughly top 16% 2-grams contain 50% of counts and top 83% 2-grams contain 90% of counts
++ roughly top 45% 3-grams contain 50% of counts and top 89% contain 90% of counts
+
+Even for 3-grams counts are distributed almost uniformly. This was expected because 
+there are more possible combinations for n-grams with bigger n , and we do not have 
+enough data to make a good coverage for all 3 and 4-grams. 
+That is why removing n-grams with the count 1 might be not the best choice in the case 
+of 4-grams. Despite this fact we decided to remove all n-grams with counts 1 for 
+every n in order to improve performance. This was done with function:
+
+```{r one_counters}
+reduceOneCounters <- function(ngram) {
+    # reduce n-grams deleting one-counters
+    ngram <- sort(unlist(ngram), decreasing=TRUE)
+    idx <- ngram == 1
+    ngram <- ngram[!idx]
+    return(ngram)
+}
+```
+
+```{r all_counts, echo=FALSE}
+if (!any(status[3:length(status)])) {
+    parseData("en_US.twitter.txt", chunksize=500, start_from=1, end_at=4000)
+    separateNgramFiles(grep("ngram", dir(), value=TRUE))
+    mergeAll(1)
+    mergeAll(2)
+    mergeAll(3)
+    mergeAll(4)
+    load("ngram_1_1")
+    gram1 <- reduceOneCounters(gram1)
+    save(gram1, file="gram1.twitter.counts")
+    rm(gram1)
+    load("ngram_1_2")
+    gram2 <- reduceOneCounters(gram2)
+    save(gram2, file="gram2.twitter.counts")
+    rm(gram2)
+    load("ngram_1_3")
+    gram3 <- reduceOneCounters(gram3)
+    save(gram3, file="gram3.twitter.counts")
+    rm(gram3)
+    load("ngram_1_4")
+    gram4 <- reduceOneCounters(gram4)
+    save(gram4, file="gram4.twitter.counts")
+    rm(gram4)
+    
+    
+    parseData("en_US.blogs.txt", chunksize=50, start_from=1, end_at=15000)
+    separateNgramFiles(grep("ngram", dir(), value=TRUE))
+    mergeAll(1)
+    mergeAll(2)
+    mergeAll(3)
+    mergeAll(4)
+    load("ngram_1_1")
+    gram1 <- reduceOneCounters(gram1)
+    save(gram1, file="gram1.blogs.counts")
+    rm(gram1)
+    load("ngram_1_2")
+    gram2 <- reduceOneCounters(gram2)
+    save(gram2, file="gram2.blogs.counts")
+    rm(gram2)
+    load("ngram_1_3")
+    gram3 <- reduceOneCounters(gram3)
+    save(gram3, file="gram3.blogs.counts")
+    rm(gram3)
+    load("ngram_1_4")
+    gram4 <- reduceOneCounters(gram4)
+    save(gram4, file="gram4.blogs.counts")
+    rm(gram4)
+    
+    
+    parseData("en_US.news.txt", chunksize=100, start_from=1, end_at=8000)
+    separateNgramFiles(grep("ngram", dir(), value=TRUE))
+    mergeAll(1)
+    mergeAll(2)
+    mergeAll(3)
+    mergeAll(4)
+    load("ngram_1_1")
+    gram1 <- reduceOneCounters(gram1)
+    save(gram1, file="gram1.news.counts")
+    rm(gram1)
+    load("ngram_1_2")
+    gram2 <- reduceOneCounters(gram2)
+    save(gram2, file="gram2.news.counts")
+    rm(gram2)
+    load("ngram_1_3")
+    gram3 <- reduceOneCounters(gram3)
+    save(gram3, file="gram3.news.counts")
+    rm(gram3)
+    load("ngram_1_4")
+    gram4 <- reduceOneCounters(gram4)
+    save(gram4, file="gram4.news.counts")
+    rm(gram4)
+}
+```
+
+## Exploratory Data Analysis
+
+### Blog Corpus
+
+As the result of data cleaning and processing we obtained the n-gram counts for blog,
+twitter and news corpora. Here you can see the size of different n-grams for
+blog corpus:
+
+```{r load_blogs, cache=TRUE, echo=FALSE}
+library(RColorBrewer)
+load("gram1.blogs.counts")
+load("gram2.blogs.counts")
+load("gram3.blogs.counts")
+load("gram4.blogs.counts")
+size <- unlist(list(one.gram=length(gram1), two.gram=length(gram2),
+                  three.gram=length(gram3), four.gram=length(gram4)))
+res <- data.frame(n.gram.size=size, row.names=names(size))
+res
+```
+
+The largest n-gram for blog corpus is 3-gram (as well as for the other corpora in 
+our dataset). This is because we removed n-grams that happened only once in
+the corpus. 4-grams contain more such "rare" n-grams that other, because there are
+more possible 4-grams than n-grams with smaller n. We do not have enough of data
+to cover all common 4-grams, so there are a lot of 4-grams with count 1, even though
+some of them are not really rare.
+
+We analysed frequencies of different words in data. The 30 most frequent words in 
+blog corpus are represented on this graph:
+
+```{r blogs_frequent_words, cache=TRUE, fig.height=4, fig.width=6, echo=FALSE}
+par(mfrow=c(1, 1))
+idx <- names(gram1) %in% c(".", "!", "?", ",", "<s>")
+gr1 <- gram1[!idx]
+col <- brewer.pal(9, "Greens")
+col <- colorRampPalette(rev(col))
+par(mar=c(6, 5, 3, 0))
+barplot(head(gr1, 30), xlab="", ylab="Counts", col=col(30), las=2, ylim=c(0, 2000000),
+        main="Most frequent words in blog corpus", cex.axis=0.6)
+```
+
+As we can see, the most common words are the "stop-words". It was expected, because
+we consciously did not remove them from the corpus during the cleaning process. We did
+not do that because they are important for the word prediction Web application,
+which is the final goal of this project. We might ignore them for some other tasks
+but predicting the next word in the sentence require them in the prediction model.
+
+Apart the "stop-words", the blog corpus contains many digits.
+
+Here you can see the barcharts of the most frequent n-grams in the blog corpus:
+
+```{r blogs_grams,  cache=TRUE, fig.height=5, fig.width=7, echo=FALSE}
+par(mfrow=c(2, 2))
+par(mar=c(5, 5, 2, 0))
+col <- brewer.pal(9, "Greens")
+col <- colorRampPalette(rev(col))
+barplot(head(gram1, 20), xlab="", col=col(20), las=2, ylim=c(0, 2000000),
+        main="Counts of 1-grams in blog corpus", cex.main=0.9)
+par(mar=c(5.5, 4, 2, 0))
+col <- brewer.pal(9, "YlOrRd")
+col <- colorRampPalette(rev(col))
+barplot(head(gram2, 20), xlab="", col=col(20), las=2, ylim=c(0, 180000),
+        main="Counts of 2-grams in blog corpus", cex.main=0.9)
+par(mar=c(8, 4, 2, 0))
+col <- brewer.pal(9, "YlGnBu")
+col <- colorRampPalette(rev(col))
+barplot(head(gram3, 20), xlab="", col=col(20), las=2, ylim=c(0, 20000),
+        main="Counts of 3-grams in blog corpus", cex.main=0.9)
+par(mar=c(10, 4, 2, 0))
+col <- brewer.pal(9, "Purples")
+col <- colorRampPalette(rev(col))
+barplot(head(gram4, 20), xlab="", col=col(20), las=2, ylim=c(0, 4000),
+        main="Counts of 4-grams in blog corpus", cex.main=0.9)
+```
+
+Punctuation marks were not removed from this graph, and we can see that
+the most frequent 1-gram is a ".". While the most frequent 3-gram there 
+is "\<s\> \<digit\> ." where tag "\<s\>" is the start of the document. This probably
+the specific feature of the blog corpus, because blog posts often have numeration, time and/or 
+date at the begining. Another interesting feature of the blog corpus is that the 
+most frequent 4-gram there is the abbreviation "U . S .", so we can conclude that either 
+the data contains a lot of documents posted by bloggers from the United States or
+US was the hot topic in blogs at the time when the data was collected.
+
+### Twitter Corpus
+
+Twitter corpus consists of fewer 1-grams and 2-grams than blog or news corpus. This
+possibly because blogs and news usually have richer content with more sophisticated 
+words from different contexs, while twitts are generally short and consists of more
+common words. 3 and 4-gram number is roughly the same for twitter, blog, and news 
+corpora.
+
+```{r load_twitter, cache=TRUE, echo=FALSE}
+library(RColorBrewer)
+load("gram1.twitter.counts")
+load("gram2.twitter.counts")
+load("gram3.twitter.counts")
+load("gram4.twitter.counts")
+size <- unlist(list(one.gram=length(gram1), two.gram=length(gram2),
+                  three.gram=length(gram3), four.gram=length(gram4)))
+res <- data.frame(n.gram.size=size, row.names=names(size))
+res
+```
+
+There are also some differences in the most common words frequencies:
+
+```{r twitter_frequent_words, cache=TRUE, fig.height=4, fig.width=6, echo=FALSE}
+par(mfrow=c(1, 1))
+idx <- names(gram1) %in% c(".", "!", "?", ",", "<s>")
+gr1 <- gram1[!idx]
+col <- brewer.pal(9, "Blues")
+col <- colorRampPalette(rev(col))
+par(mar=c(6, 5, 3, 0))
+barplot(head(gr1, 30), xlab="", ylab="Counts", col=col(30), las=2, ylim=c(0, 1200000),
+        main="Most frequent words in twitter corpus", cex.axis=0.6)
+```
+
+While the most frequent words are generally also "stop-words" as in blogs and news data,
+twitter corpus contains many "bad-words".
+
+The most frequent n-grams are also differ significantly from blogs, and news corpora:
+
+```{r twitter_grams,  cache=TRUE, fig.height=5, fig.width=7, echo=FALSE}
+par(mfrow=c(2, 2))
+par(mar=c(5, 5, 2, 0))
+col <- brewer.pal(9, "Blues")
+col <- colorRampPalette(rev(col))
+barplot(head(gram1, 20), xlab="", col=col(20), las=2, ylim=c(0, 2000000),
+        main="Counts of 1-grams in twitter corpus", cex.main=0.9)
+par(mar=c(5.5, 4, 2, 0))
+col <- brewer.pal(9, "Oranges")
+col <- colorRampPalette(rev(col))
+barplot(head(gram2, 20), xlab="", col=col(20), las=2, ylim=c(0, 200000),
+        main="Counts of 2-grams in twitter corpus", cex.main=0.9)
+par(mar=c(8, 4, 2, 0))
+col <- brewer.pal(9, "BuGn")
+col <- colorRampPalette(rev(col))
+barplot(head(gram3, 20), xlab="", col=col(20), las=2, ylim=c(0, 25000),
+        main="Counts of 3-grams in twitter corpus", cex.main=0.9)
+par(mar=c(10, 4, 2, 0))
+col <- brewer.pal(9, "BuPu")
+col <- colorRampPalette(rev(col))
+barplot(head(gram4, 20), xlab="", col=col(20), las=2, ylim=c(0, 20000),
+        main="Counts of 4-grams in twitter corpus", cex.main=0.9)
+```
+
+The most frequent 1 and 2-grams in the twitter corpus contain "\<s\>" tag that 
+means start of the document. This is not surprising, because twitts are usually 
+short, and corpus from twitter will have more documents than a corpus of the same 
+size in bytes with blogs or news. 
+
+Another feature of twitter data is that most frequent 3 and 4-grams generally contain 
+word "thank". It is probably dew to the fact that there are a lot of twitts like 
+"thanks for the follow", "thanks for the rt", etc. in the corpus.
+
+### News Corpus
+
+News corpus consists of roughly the same number of different n-grams and have 
+approximately the same most frequent words distribution as corpus with blogs:
+
+```{r load_news, cache=TRUE, echo=FALSE}
+library(RColorBrewer)
+load("gram1.news.counts")
+load("gram2.news.counts")
+load("gram3.news.counts")
+load("gram4.news.counts")
+size <- unlist(list(one.gram=length(gram1), two.gram=length(gram2),
+                  three.gram=length(gram3), four.gram=length(gram4)))
+res <- data.frame(n.gram.size=size, row.names=names(size))
+res
+```
+
+```{r news_frequent_words, cache=TRUE, fig.height=4, fig.width=6, echo=FALSE}
+par(mfrow=c(1, 1))
+idx <- names(gram1) %in% c(".", "!", "?", ",", "<s>")
+gr1 <- gram1[!idx]
+col <- brewer.pal(9, "Oranges")
+col <- colorRampPalette(rev(col))
+par(mar=c(6, 5, 3, 0))
+barplot(head(gr1, 30), xlab="", ylab="Counts", col=col(30), las=2, ylim=c(0, 2000000),
+        main="Most frequent words in news corpus", cex.axis=0.6)
+```
+
+There are different the most common 3 and 4 grams in news corpus 
+comparing to the other. They have a lot of digits and time abbreviations like
+"a . m .", "p . m ." or their combinations. There is also "u . s ." abbreviation
+there as in the blogs corpus:
+
+```{r news_grams,  cache=TRUE, fig.height=5, fig.width=7, echo=FALSE}
+par(mfrow=c(2, 2))
+par(mar=c(5, 5, 2, 0))
+col <- brewer.pal(9, "Oranges")
+col <- colorRampPalette(rev(col))
+barplot(head(gram1, 20), xlab="", col=col(20), las=2, ylim=c(0, 2000000),
+        main="Counts of 1-grams in news corpus", cex.main=0.9)
+par(mar=c(5.5, 4, 2, 0))
+col <- brewer.pal(9, "Greens")
+col <- colorRampPalette(rev(col))
+barplot(head(gram2, 20), xlab="", col=col(20), las=2, ylim=c(0, 200000),
+        main="Counts of 2-grams in news corpus", cex.main=0.9)
+par(mar=c(8, 4, 2, 0))
+col <- brewer.pal(9, "Reds")
+col <- colorRampPalette(rev(col))
+barplot(head(gram3, 20), xlab="", col=col(20), las=2, ylim=c(0, 30000),
+        main="Counts of 3-grams in news corpus", cex.main=0.9)
+par(mar=c(10, 4, 2, 0))
+col <- brewer.pal(9, "PuBuGn")
+col <- colorRampPalette(rev(col))
+barplot(head(gram4, 20), xlab="", col=col(20), las=2, ylim=c(0, 20000),
+        main="Counts of 4-grams in twitter corpus", cex.main=0.9)
+```
+
+## Predictive Model
+
+### Probability model
+
+N-gram counts were transormed into probabilities to have the last word in n-gram
+given the previous words from n-gram. For each n-gram this probability migh be 
+calculated as count of n-gram divided by count of (n-1)-gram (n-gram without the 
+last word). Here is the function that calculates these probabilietes for 2, 3 and 
+4-grams evaluating them in chunks of 50000 in order to increase performance:
+
+```{r prob_model}
+getProbability <- function(counts, ngram_minus_one) {
+    # calculates conditional probability of having the last word in n-gram
+    # given the rest of n-gram
+    xgram <- integer(0)
+    for (index in 1:length(counts)) {
+        item <- counts[index]
+        name <- names(item)
+        splitted <- strsplit(name, split=" ")[[1]]
+        name_minus_one <- splitted[1:length(splitted)-1]
+        xgram <- c(xgram, item[[1]] / ngram_minus_one[[paste(name_minus_one, collapse=" ")]])
+        if (index %% 50000 == 0){
+#             print(paste(index, "elements was evaluated", date())) # performance testing
+            save(xgram, file=paste0("temp.file_", index))
+            xgram <- integer(0)
+        }
+    }
+    save(xgram, file=paste0("temp.file_", index))
+    rm(xgram)
+    files_to_collapse <- grep("temp.file_", dir(), value=TRUE)
+    files_to_collapse <- files_to_collapse[order(as.numeric(gsub("temp.file_", "", files_to_collapse)))]
+    result <- integer(0)
+    for (file in files_to_collapse) {
+        load(file)
+        result <- c(result, xgram)
+        rm(xgram)
+    }
+    names(result) <- names(counts)
+    file.remove(files_to_collapse)
+    return(result)
+}
+```
+
+```{r prob_count, cache=TRUE, echo=FALSE}
+if (!status[length(status)]){
+    load("gram1.twitter.counts")
+    load("gram2.twitter.counts")
+    bigram <- getProbability(gram2, gram1)
+    rm(gram1)
+    save(bigram, file="twitter.bigram")
+    rm(bigram)
+    load("gram3.twitter.counts")
+    threegram <- getProbability(gram3, gram2)
+    rm(gram2)
+    save(threegram, file="twitter.threegram")
+    rm(threegram)
+    load("gram4.twitter.counts")
+    fourgram <- getProbability(gram4, gram3)
+    rm(gram3, gram4)
+    save(fourgram, file="twitter.fourgram")
+    load("twitter.bigram")
+    load("twitter.threegram")
+    model <- list(bigram=sort(bigram, decreasing=TRUE), 
+                  threegram=sort(threegram, decreasing=TRUE), 
+                  fourgram=sort(fourgram, decreasing=TRUE))
+    save(model, file="twitter.model")
+    rm(bigram, threegram, fourgram, model)
+    
+    
+    load("gram1.blogs.counts")
+    load("gram2.blogs.counts")
+    bigram <- getProbability(gram2, gram1)
+    rm(gram1)
+    save(bigram, file="blogs.bigram")
+    rm(bigram)
+    load("gram3.blogs.counts")
+    threegram <- getProbability(gram3, gram2)
+    rm(gram2)
+    save(threegram, file="blogs.threegram")
+    rm(threegram)
+    load("gram4.blogs.counts")
+    fourgram <- getProbability(gram4, gram3)
+    rm(gram3, gram4)
+    save(fourgram, file="blogs.fourgram")
+    load("blogs.bigram")
+    load("blogs.threegram")
+    model <- list(bigram=sort(bigram, decreasing=TRUE), 
+                  threegram=sort(threegram, decreasing=TRUE), 
+                  fourgram=sort(fourgram, decreasing=TRUE))
+    save(model, file="blogs.model")
+    rm(bigram, threegram, fourgram, model)
+    
+    
+    load("gram1.news.counts")
+    load("gram2.news.counts")
+    bigram <- getProbability(gram2, gram1)
+    rm(gram1)
+    save(bigram, file="news.bigram")
+    rm(bigram)
+    load("gram3.news.counts")
+    threegram <- getProbability(gram3, gram2)
+    rm(gram2)
+    save(threegram, file="news.threegram")
+    rm(threegram)
+    load("gram4.news.counts")
+    fourgram <- getProbability(gram4, gram3)
+    rm(gram3, gram4)
+    save(fourgram, file="news.fourgram")
+    load("news.bigram")
+    load("news.threegram")
+    
+    model <- list(bigram=sort(bigram, decreasing=TRUE), 
+                  threegram=sort(threegram, decreasing=TRUE), 
+                  fourgram=sort(fourgram, decreasing=TRUE))
+    save(model, file="news.model")
+    rm(bigram, threegram, fourgram, model)
+}    
+```
+
+After calculating probabilietes for each n-gram, they were placed into the model 
+objects (three objects separately for twitts, news, and blogs).
+
+### Optimization
+
+Optimization is heavily dependant on the requirements for the final product. So
+we should describe how the final Web application expected to perform. It have to contain
+text input form, where user should type or paste the text. Data from this form is
+processed with predictive function that returns most probable next words using our
+n-gram models. It also might return more than one word, but some reasonable number of
+words in order to give a possibility to choice the right one by user itself. The
+goal of this application is to reduce the amount of typing, because it might be not
+very convinient when using mobile devices. So giving 5 most probable next word to
+a user should be a reasonable number of items to choice from. Five items is not to 
+many and could be easily showed at a mobile device screen, while it also give some
+space for selection.
+
+Taking to consideration provided description of the final product, we can think how
+our predictive models might be optimized. We do not require more than 5 predictions
+for each input text so we can reduce the size of models by deleting all predictions
+beside the top-5 for each n-gram (without counting the punctuation marks, they will
+be treated separately by the predictive function). So at the end we should have 
+predictive models with no more than 5 predictions of words for each n-gram, plus
+predictions of punctuation marks.
+
+```{r optimization_func}
+optFunc <- function(ngram){
+    n <- length(strsplit(names(ngram[1]), split=" ")[[1]])
+    one_ind <- ngram == 1
+    one_part <- ngram[one_ind]
+    ngram <- ngram[!one_ind]
+    ngram <- rev(ngram)
+    print(length(ngram))
+    index <- 1
+    removed <- 0
+    while (!is.na(item <- ngram[index])){
+        to_find <- strsplit(names(item), split=" ")[[1]]
+        for (punct in c("!", "?", ".", ",")) {
+            pattern <- paste0("\\", punct)
+            replacement <- paste0("\\\\", punct)
+            to_find  <- gsub(pattern, replacement, to_find)
+        }
+        to_find <- paste(to_find[1:(length(to_find)-1)], collapse=" ")
+        print(to_find)
+        indexes <- grep(paste0("^", to_find, " "), names(ngram))
+        print(paste("Number of objects", length(indexes)))
+        item_names <- names(ngram[indexes])
+        last_words <- unlist(lapply(item_names, function(x) strsplit(x, split=" ")[[1]][n]))
+        last_words <- !last_words %in% c(".", "!", ",", "?")
+        indexes <- rev(indexes[last_words])
+        print(ngram[head(indexes, 5)])
+        to_remove <- setdiff(indexes, head(indexes, 5))
+        removed <- removed + length(to_remove)
+        print(paste("Number of objects to remove", length(to_remove)))
+        if (length(to_remove) > 0){ 
+            ngram <- ngram[-to_remove]
+            print(length(ngram))
+        } else {
+            index <- index + 1
+        }
+        print(paste("n-grams removed", removed))
+    }
+    return(c(one_part, rev(ngram)))
+}
+
+
+opt_tree <- optFunc(threegram)
+opt_model <- lapply(model, optFunc) 
+```
+
+
+```{r optimization_models, echo=FALSE}
+load("twitter.model")
+print("Twitter model length before and after the optimization:")
+before <- unlist(lapply(model, length))
+after <- unlist(lapply(model, length))
+res <- data.frame(before=before, after=after)
+res
+rm(model)
+load("blogs.model")
+print("Blogs model length before and after the optimization:")
+before <- unlist(lapply(model, length))
+after <- unlist(lapply(model, length))
+res <- data.frame(before=before, after=after)
+res
+rm(model)
+# load("news.model")
+# print("News model length before and after the optimization:")
+# before <- unlist(lapply(model, length))
+# after <- unlist(lapply(model, length))
+# res <- data.frame(before=before, after=after)
+# res
+# rm(model)
+```
+
+### Predictive Function
+
+### Performance Testing
+
+## Web Application
