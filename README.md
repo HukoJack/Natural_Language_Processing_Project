@@ -1,4 +1,4 @@
-# Building a Predictive Text Model for Words Prediction of Twitter, News, and Blogs Texts 
+# Building a Predictive Text Model for Words Prediction in Twitter, News, and Blogs Texts 
 
 This is an educational Capstone Project, which is the part of [Data Science Specialization](https://www.coursera.org/specialization/jhudatascience/1?utm_medium=listingPage) provided by Johns Hopkins University on Coursera. 
 
@@ -30,6 +30,7 @@ Note that the raw data contain words of offensive and profane meaning.
 You can explore reproducible R markdown document describing model building and testing process here:
 
 [Report](http://htmlpreview.github.io/?https://github.com/HukoJack/Natural_Language_Processing_Project/blob/master/Report.html)
+(haven't been finished yet)
 
 You can have access to demonstrational Web application here:
 

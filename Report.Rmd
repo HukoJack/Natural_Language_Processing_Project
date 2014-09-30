@@ -1,5 +1,5 @@
 ---
-title: "Building a Predictive Text Model for Twitter, News, and Blogs Word Prediction"
+title: "Building a Predictive Text Model for Words Prediction in Twitter, News, and Blogs Texts"
 output: html_document
 ---
 
@@ -67,12 +67,7 @@ if (!any(status)) {
 }
 ```
 
-After downloading, lines 77259, 776277, 926143, 948564 were manually removed 
-from "en_US.news.txt" file dew to the special character SUB (Ctrl+Z) in them. This
-character causes termination of the data reading process for the "readLines" function
-in R.
-
-The data in each file was separated into two parts. First part, which consisted of
+The data in each file was separated into two parts. First part, which consist of
 roughly 80% of data, was used as training set for n-gram counts generation and in
 building of the predictive model for the word prediction task. The rest of the data was
 used as a test set for the model performance evaluation. Here is data distribution for 
@@ -85,10 +80,10 @@ all three files:
 #### Data Cleaning
 
 The raw data contains upper-case letters, punctuation marks, textual emotion 
-expressions (different kinds of smiles), digits, e-mails, hashtags, offensive 
+expressions (different kinds of smiles), digits, e-mails, hash-tags, offensive 
 and profane words, duplicated symbols, and some other special symbols that should be 
 handled before further processing. It is expected that data from Twitter have 
-much more issues like these. Dew to this fact, twitter predictive model also might 
+much more issues like these. Due to this fact, twitter predictive model also might 
 have worse performance than other models, while data from blogs and news has been written 
 in much more clear way. Libraries "tm" and "stringi" were used for data cleaning. 
 At the first step of cleaning process all documents in corpus were transformed to the
@@ -106,14 +101,14 @@ remove symbols like "-" and different kinds of apostrophes, because they play
 important role in some combined words like "I'm", "don't", "e-mail", etc. Also we
 can't remove all meaningful punctuation marks (",.?!"), which might cause full chaos 
 in corpus and produce n-grams that normally do not appear in sentence. Before handling 
-punctuations, symbol ";" was replaced with "," dew to the close meaning. We decided to left
+punctuations, symbol ";" was replaced with "," due to the close meaning. We decided to left
 punctuation marks ",.?!" and treat them like separate words in our 
 prediction model, because in this case they can be used for punctuation prediction, 
 while they can be easily filtered when there is no need in them.
-After handling these special symbols all other symbols ")(:#%$^\\~}&+=@/"_]+"
+After handling these special symbols all other symbols "\)\:\#\%\$\^\\\~\}\&\+\=\@\/\"\_\]\+"
 were removed.
 
-We did not remove hashtags but only hashtag symbols, because they usually are meaningful.
+We did not remove hash-tags but only hash-tag symbols, because they usually are meaningful.
 Also we decided not to remove stop words from corpus. For more convenience all 
 the cleaning procedures described above were placed into one function, that was 
 used in data parser later:
@@ -205,7 +200,7 @@ After we obtained clean corpus of documents, the next important step in creation
 data model is word tokenization and n-gram counting. N-grams might be counted by
 making n-gram matrices using standard function from "tm" package. But
 there are some problems with this approach. Firstly, data matrices produced with it
-on natural language are very sparse and mostly consists of zeroes. Secondly, dew 
+on natural language are very sparse and mostly consists of zeroes. Secondly, due 
 to the previous fact, it is quite a slow process. Thirdly, we have reasonable amounts
 of data, and there will be billions of n-grams there. You just can't store such a big 
 matrix in memory. One way to handle this problem is to do not use matrices for 
@@ -290,7 +285,7 @@ parseData <- function(filename, chunksize=1000, start_from=1, end_at=4000) {
     # This function takes file with raw data by small chunks and
     # provides data cleaning, counting n-grams and storing them into files
     library(tm)
-    con <- file(filename, open="r")
+    con <- file(filename, open="rb")
     num <- 0
     ngram_list <- grep("ngram", dir(), value=TRUE)
     if (length(ngram_list) != 0) {
@@ -334,7 +329,7 @@ decided to create three different models for each context (news, blogs and twitt
 #### Reduce Phase
 
 In the reduce phase we reduced all the n-grams counts from the all files
-created in the map phase. Three different functions was created in order to perform this.
+created in the map phase. Three different functions was created to perform this.
 The first one splits files with 1, 2, 3 and 4-gram counts into four separate files.
 Second takes two files with n-gram counts of the same rank and merge them together.
 And the third one is a higher level function that goes over all of files with n-gram counts
@@ -447,14 +442,14 @@ mergeAll <- function(n) {
 
 #### n-gram Counts Optimization
 
-The final aim of this project is a Web App that might be used on mobile gadgets 
+The final aim of this project is a Web application that might be used on mobile gadgets 
 for the next word prediction task and this fact cause some restrictions on our 
 predictive model. It should be reasonably small, do not require a lot of resources, and
 have a high performance, because it should work in real-time manner. One possible way to
 make optimization without affecting accuracy of the model is to delete some very rare n-grams. 
 
 This might also cause some other positive effects. We did not even 
-tried to filter words in corpora in order to find some misspelled
+tried to filter words in corpora to find some misspelled
 words, words from other languages, and random sets of symbols like "dadasfga sfghasgdf"
 during the cleaning process. The intuition was that words like these should be very rare in the dataset and after n-gram counting we can just remove n-grams with the lowest counts.
 
@@ -469,7 +464,7 @@ there are more possible combinations for n-grams with bigger n , and we do not h
 enough data to make a good coverage for all 3 and 4-grams. 
 That is why removing n-grams with the count 1 might be not the best choice in the case 
 of 4-grams. Despite this fact we decided to remove all n-grams with counts 1 for 
-every n in order to improve performance. This was done with function:
+every n to improve performance. This was done with function:
 
 ```{r one_counters}
 reduceOneCounters <- function(ngram) {
@@ -605,7 +600,7 @@ but predicting the next word in the sentence require them in the prediction mode
 
 Apart the "stop-words", the blog corpus contains many digits.
 
-Here you can see the barcharts of the most frequent n-grams in the blog corpus:
+Here you can see the bar-charts of the most frequent n-grams in the blog corpus:
 
 ```{r blogs_grams,  cache=TRUE, fig.height=5, fig.width=7, echo=FALSE}
 par(mfrow=c(2, 2))
@@ -635,7 +630,7 @@ Punctuation marks were not removed from this graph, and we can see that
 the most frequent 1-gram is a ".". While the most frequent 3-gram there 
 is "\<s\> \<digit\> ." where tag "\<s\>" is the start of the document. This probably
 the specific feature of the blog corpus, because blog posts often have numeration, time and/or 
-date at the begining. Another interesting feature of the blog corpus is that the 
+date at the beginning. Another interesting feature of the blog corpus is that the 
 most frequent 4-gram there is the abbreviation "U . S .", so we can conclude that either 
 the data contains a lot of documents posted by bloggers from the United States or
 US was the hot topic in blogs at the time when the data was collected.
@@ -644,7 +639,7 @@ US was the hot topic in blogs at the time when the data was collected.
 
 Twitter corpus consists of fewer 1-grams and 2-grams than blog or news corpus. This
 possibly because blogs and news usually have richer content with more sophisticated 
-words from different contexs, while twitts are generally short and consists of more
+words from different contexts, while twits are generally short and consists of more
 common words. 3 and 4-gram number is roughly the same for twitter, blog, and news 
 corpora.
 
@@ -703,12 +698,12 @@ barplot(head(gram4, 20), xlab="", col=col(20), las=2, ylim=c(0, 20000),
 ```
 
 The most frequent 1 and 2-grams in the twitter corpus contain "\<s\>" tag that 
-means start of the document. This is not surprising, because twitts are usually 
+means start of the document. This is not surprising, because twits are usually 
 short, and corpus from twitter will have more documents than a corpus of the same 
 size in bytes with blogs or news. 
 
 Another feature of twitter data is that most frequent 3 and 4-grams generally contain 
-word "thank". It is probably dew to the fact that there are a lot of twitts like 
+word "thank". It is probably due to the fact that there are a lot of twits like 
 "thanks for the follow", "thanks for the rt", etc. in the corpus.
 
 ### News Corpus
@@ -772,11 +767,12 @@ barplot(head(gram4, 20), xlab="", col=col(20), las=2, ylim=c(0, 20000),
 
 ### Probability model
 
-N-gram counts were transormed into probabilities to have the last word in n-gram
-given the previous words from n-gram. For each n-gram this probability migh be 
-calculated as count of n-gram divided by count of (n-1)-gram (n-gram without the 
-last word). Here is the function that calculates these probabilietes for 2, 3 and 
-4-grams evaluating them in chunks of 50000 in order to increase performance:
+N-gram counts were transformed into probabilities to have the last word in n-gram
+given the previous words. For each n-gram this probability might be 
+calculated as the count of the particular n-gram divided on the count of 
+(n-1)-gram (the same n-gram but without the last word). Here is the function 
+that calculates these probabilities for 2, 3 and 4-grams evaluating them in 
+chunks of 50000 to improve performance:
 
 ```{r prob_model}
 getProbability <- function(counts, ngram_minus_one) {
@@ -887,8 +883,8 @@ if (!status[length(status)]){
 }    
 ```
 
-After calculating probabilietes for each n-gram, they were placed into the model 
-objects (three objects separately for twitts, news, and blogs).
+After calculating probabilities for each n-gram, they were placed into the model 
+objects (three objects separately for twits, news, and blogs).
 
 ### Optimization
 
@@ -897,9 +893,9 @@ we should describe how the final Web application expected to perform. It have to
 text input form, where user should type or paste the text. Data from this form is
 processed with predictive function that returns most probable next words using our
 n-gram models. It also might return more than one word, but some reasonable number of
-words in order to give a possibility to choice the right one by user itself. The
+words to give a possibility to choice the right one by user itself. The
 goal of this application is to reduce the amount of typing, because it might be not
-very convinient when using mobile devices. So giving 5 most probable next word to
+very convenient when using mobile devices. So giving 5 most probable next words to
 a user should be a reasonable number of items to choice from. Five items is not to 
 many and could be easily showed at a mobile device screen, while it also give some
 space for selection.
@@ -908,9 +904,9 @@ Taking to consideration provided description of the final product, we can think 
 our predictive models might be optimized. We do not require more than 5 predictions
 for each input text so we can reduce the size of models by deleting all predictions
 beside the top-5 for each n-gram (without counting the punctuation marks, they will
-be treated separately by the predictive function). So at the end we should have 
-predictive models with no more than 5 predictions of words for each n-gram, plus
-predictions of punctuation marks.
+be treated separately by the predictive function), because they will never appear 
+in predictions. So at the end we should have predictive models with no more than 5 
+predictions for each n-gram, plus any predictions of punctuation marks.
 
 ```{r optimization_func}
 optFunc <- function(ngram){
@@ -952,34 +948,60 @@ optFunc <- function(ngram){
     return(c(one_part, rev(ngram)))
 }
 
-
-opt_tree <- optFunc(threegram)
-opt_model <- lapply(model, optFunc) 
+# opt_tree <- optFunc(threegram)
+# opt_model <- lapply(model, optFunc) 
 ```
 
 
+```{r optimization, echo=FALSE}
+# if (!(file.exists("optimized.twitter.model") & 
+#         file.exists("optimized.blogs.model") &
+#         file.exists("optimized.news.model"))) {
+#     load("twitter.model")
+#     opt_model <- lapply(model, optFunc)
+#     save(model, file="optimized.twitter.model")
+#     rm(model)
+#     load("blogs.model")
+#     opt_model <- lapply(model, optFunc)
+#     save(model, file="optimized.blogs.model")
+#     rm(model)
+#     load("news.model")
+#     opt_model <- lapply(model, optFunc)
+#     save(model, file="optimized.news.model")
+#     rm(model)
+# }
+```
+
 ```{r optimization_models, echo=FALSE}
-load("twitter.model")
-print("Twitter model length before and after the optimization:")
-before <- unlist(lapply(model, length))
-after <- unlist(lapply(model, length))
-res <- data.frame(before=before, after=after)
-res
-rm(model)
-load("blogs.model")
-print("Blogs model length before and after the optimization:")
-before <- unlist(lapply(model, length))
-after <- unlist(lapply(model, length))
-res <- data.frame(before=before, after=after)
-res
-rm(model)
-# load("news.model")
-# print("News model length before and after the optimization:")
+# load("twitter.model")
+# print("Twitter model length before and after the optimization:")
 # before <- unlist(lapply(model, length))
+# rm(model)
+# load("optimized.twitter.model")
 # after <- unlist(lapply(model, length))
 # res <- data.frame(before=before, after=after)
 # res
+# rm(model, before, after, res)
+# 
+# load("blogs.model")
+# print("Blogs model length before and after the optimization:")
+# before <- unlist(lapply(model, length))
 # rm(model)
+# load("optimized.blogs.model")
+# after <- unlist(lapply(model, length))
+# res <- data.frame(before=before, after=after)
+# res
+# rm(model, before, after, res)
+# 
+# load("news.model")
+# print("News model length before and after the optimization:")
+# before <- unlist(lapply(model, length))
+# rm(model)
+# load("optimized.news.model")
+# after <- unlist(lapply(model, length))
+# res <- data.frame(before=before, after=after)
+# res
+# rm(model, before, after, res)
 ```
 
 ### Predictive Function
