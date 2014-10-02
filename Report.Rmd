@@ -1,11 +1,12 @@
 ---
 title: "Building a Predictive Text Model for Words Prediction in Twitter, News, and Blogs Texts"
+author: Mykola Steshenko
 output: html_document
 ---
 
 ## Synopsis
 
-
+The obsession of smartphones and other mobile devices has significantly affected our life, and we spend much time typing different kinds of texts in them. The typing still remains very unconvinient due to the size of devices, their virtual keyboards, sensor monitors and some other features. Smart keyboards can improve effeciency of this proccess considerably, reducing the amount of typing by a factor of 2 or even more. The main goal of this project is to develope predictive text model for such keyboard, which will be able to predict the most probable next words for twitter, news, and blogs texts. After that, this model will be implemented into a demonstrational Web application.
 
 ## Data
 
@@ -35,15 +36,15 @@ particular dataset that was used for analysis was provided by
 [Coursera-SwiftKey.zip](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)
 
 Zip archive contains files in format LOCALE.blogs.txt where LOCALE is the each 
-of the four locales en_US, de_DE, ru_RU and fi_FI. We will use only English
-corpora in this project, which consists of three files "en_US.twitter.txt",  
-"en_US.blogs.txt", and "en_US.news.txt". As it mentioned in names of the files, 
+of the four locales en\_US, de\_DE, ru\_RU and fi\_FI. We will use only English
+corpora in this project, which consists of three files "en\_US.twitter.txt",  
+"en\_US.blogs.txt", and "en\_US.news.txt". As it mentioned in names of the files, 
 they contain raw textual data from twitter, blogs and news respectively. The 
 files also might contain some foreign text and words of offensive and profane 
 meaning. Here is basic information about size and counts of lines, words, and symbols
 for each file:
 
-```{r info, echo=FALSE}
+```{r info, echo=FALSE, echo=FALSE}
 info <- data.frame(row.names=c("en_US.blogs.txt", "en_US.news.txt", "en_US.twitter.txt"), 
                    line_counts=c(899288, 1010242, 2360148), 
                    word_counts=c(37334131, 34372530, 30373583), 
@@ -57,7 +58,7 @@ Additional description for this dataset is available in HC Corpora [ReadMe](http
 
 ### Data processing
 
-```{r download, echo=FALSE}
+```{r download, echo=FALSE, echo=FALSE}
 if (!any(status)) {
     download.file("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip", "Coursera-SwiftKey.zip", mode="wb")
    unzip("Coursera-SwiftKey.zip", junkpaths=TRUE, 
@@ -113,7 +114,7 @@ Also we decided not to remove stop words from corpus. For more convenience all
 the cleaning procedures described above were placed into one function, that was 
 used in data parser later:
 
-```{r cleaning}
+```{r cleaning, echo=FALSE}
 cleanCorpus <- function(corpus) {
     # Makes some cleaning and symbol handling procedures for tm corpus of textdata
     library(tm)
@@ -128,7 +129,7 @@ cleanCorpus <- function(corpus) {
     # email replacement
     corpus  <- tm_map(corpus, function (x) gsub("[[:alnum:].-]+@[[:alnum:].-]+", " <e-mail> ", x[[1]]))
     # remove some smiles that might left standalone alphabetic symbols after deletion
-    for (smile in c("x-p", "o.o", "[-=:;][boqje#pds]", "<3")) {
+    for (smile in c("x-p", "o.o", "[=:;][boqje#pds]")) {
         corpus  <- tm_map(corpus, function (x) gsub(smile, "", x[[1]]))
     }
     # replace ?!?!?!?! and ;
@@ -155,7 +156,7 @@ cause some problems with text consistency, so we replaced them with special tag
 "\<badword\>". The universal regular expression for the most common profane words
 was created using freely available [bad-words dictionary](http://urbanoalvarez.es/blog/2008/04/04/bad-words-list/). It was used later in special bad-word handling function: 
 
-```{r badwords}
+```{r badwords, echo=FALSE}
 badWordHandle <- function(corpus) {
     # Change most frequent badwords to <badword> tag
     reg <- " screw | wank[a-z]*|b[o0][o0]bs|l3i[a-z]ch|knob|or[ia]f[ai][cs]|[a-z]damn |d[iy]ck|q[uw]e[ei]r| arse|[ck]awk| gay|retard|s[kc]anc*k|t[ie]+t[sz]|slut|puss[ye]|vul+va|vag*[i1]*j*i*na|pola[ck]|phu[ck]|pe[ie]*n[a1iu]+s|pac*k[iy]| anal | anus |butt[wh-]|clit|crap|pu[tl][eao] |jar*c*k[\\s-]*off|blow\\s*job|ji[zs]+|nazi|w*h[o0]+a*r|a[s]*h[o0]le|sh[i1!y]t|mas+t[eu]*rbai*t|n[i1]+g+[eu]*r| a[sz][sz]|bas+t[ae]rd|b[!i1][a7]*tch|c[o0]ck| cum |[ck]u*nt|dild[a-z]*|f\\s*u\\s*c*\\s*k|fai*g"
@@ -176,7 +177,7 @@ We do this for the reason to be able to predict words at the beginning of the te
 when there were no words printed yet. All these white-space processing procedures
 were placed into one function, that will be used in parser later:
 
-```{r whitespace}
+```{r whitespace, echo=FALSE}
 whiteSpaceCorrection <- function(corpus) {
     # Provides end/begin whitespace trimming an removing of whitespace duplicates
     corpus  <- tm_map(corpus, function (x) gsub("^\\s+|\\s+$", "", x[[1]]))
@@ -221,7 +222,7 @@ counts.
 N-grams was counted with this function that takes a small chunk of data as an input
 and writes 1, 2, 3 and 4-grams counts to global storage objects:
 
-```{r ngram_counts}
+```{r ngram_counts, echo=FALSE}
 n_gramCount <- function (data) {
     # writes counts of all possible 1, 2, 3 and 4 grams from corpus to 
     # global ngram storage objects "gram1", "gram2", "gram3", "gram4"
@@ -280,7 +281,7 @@ Also was created a higher level parser function that takes a name of file, size 
 chunk, starting and end points for data parsing as input. It use previous function
 to count n-grams and store them to hard disk drive into a single file for each chunk.
 
-```{r parser}
+```{r parser, echo=FALSE}
 parseData <- function(filename, chunksize=1000, start_from=1, end_at=4000) {
     # This function takes file with raw data by small chunks and
     # provides data cleaning, counting n-grams and storing them into files
@@ -335,7 +336,7 @@ Second takes two files with n-gram counts of the same rank and merge them togeth
 And the third one is a higher level function that goes over all of files with n-gram counts
 and merge them for the given n.
 
-```{r reducers}
+```{r reducers, echo=FALSE}
 separateNgramFiles <- function(filenames_list) {
     # Separate composit ngram files to files that contains only one type of ngrams
     count <- 0
@@ -466,7 +467,7 @@ That is why removing n-grams with the count 1 might be not the best choice in th
 of 4-grams. Despite this fact we decided to remove all n-grams with counts 1 for 
 every n to improve performance. This was done with function:
 
-```{r one_counters}
+```{r one_counters, echo=FALSE}
 reduceOneCounters <- function(ngram) {
     # reduce n-grams deleting one-counters
     ngram <- sort(unlist(ngram), decreasing=TRUE)
@@ -774,7 +775,7 @@ calculated as the count of the particular n-gram divided on the count of
 that calculates these probabilities for 2, 3 and 4-grams evaluating them in 
 chunks of 50000 to improve performance:
 
-```{r prob_model}
+```{r prob_model, echo=FALSE}
 getProbability <- function(counts, ngram_minus_one) {
     # calculates conditional probability of having the last word in n-gram
     # given the rest of n-gram
@@ -889,33 +890,31 @@ objects (three objects separately for twits, news, and blogs).
 ### Optimization
 
 Optimization is heavily dependant on the requirements for the final product. So
-we should describe how the final Web application expected to perform. It have to contain
-text input form, where user should type or paste the text. Data from this form is
+we should describe how the final Web application is expected to perform. It have 
+to contain text input form, where user may type the text. Data from this form is
 processed with predictive function that returns most probable next words using our
 n-gram models. It also might return more than one word, but some reasonable number of
-words to give a possibility to choice the right one by user itself. The
+words to give a possibility to choose the right one by user itself. The
 goal of this application is to reduce the amount of typing, because it might be not
-very convenient when using mobile devices. So giving 5 most probable next words to
-a user should be a reasonable number of items to choice from. Five items is not to 
-many and could be easily showed at a mobile device screen, while it also give some
-space for selection.
+very convenient on mobile devices. So giving 5 most probable next words to
+a user should be a reasonable number of words to choose from. Five items is not too 
+many, and they could be easily showed at a mobile device screen.
 
 Taking to consideration provided description of the final product, we can think how
 our predictive models might be optimized. We do not require more than 5 predictions
-for each input text so we can reduce the size of models by deleting all predictions
-beside the top-5 for each n-gram (without counting the punctuation marks, they will
+for each input text, so we can reduce the size of models by deleting all predictions
+beside the top-5 for each n-gram (without removing the punctuation marks, they will
 be treated separately by the predictive function), because they will never appear 
 in predictions. So at the end we should have predictive models with no more than 5 
 predictions for each n-gram, plus any predictions of punctuation marks.
 
-```{r optimization_func}
+```{r optimization_func, echo=FALSE}
 optFunc <- function(ngram){
     n <- length(strsplit(names(ngram[1]), split=" ")[[1]])
     one_ind <- ngram == 1
     one_part <- ngram[one_ind]
     ngram <- ngram[!one_ind]
     ngram <- rev(ngram)
-    print(length(ngram))
     index <- 1
     removed <- 0
     while (!is.na(item <- ngram[index])){
@@ -926,86 +925,482 @@ optFunc <- function(ngram){
             to_find  <- gsub(pattern, replacement, to_find)
         }
         to_find <- paste(to_find[1:(length(to_find)-1)], collapse=" ")
-        print(to_find)
         indexes <- grep(paste0("^", to_find, " "), names(ngram))
-        print(paste("Number of objects", length(indexes)))
         item_names <- names(ngram[indexes])
         last_words <- unlist(lapply(item_names, function(x) strsplit(x, split=" ")[[1]][n]))
         last_words <- !last_words %in% c(".", "!", ",", "?")
         indexes <- rev(indexes[last_words])
-        print(ngram[head(indexes, 5)])
         to_remove <- setdiff(indexes, head(indexes, 5))
         removed <- removed + length(to_remove)
-        print(paste("Number of objects to remove", length(to_remove)))
         if (length(to_remove) > 0){ 
             ngram <- ngram[-to_remove]
-            print(length(ngram))
+#             print(paste("n-grams left", length(ngram))) 
+#             print(paste("n-grams removed", removed)) # performance testing
         } else {
             index <- index + 1
         }
-        print(paste("n-grams removed", removed))
     }
+    print("Done")
     return(c(one_part, rev(ngram)))
 }
 
-# opt_tree <- optFunc(threegram)
-# opt_model <- lapply(model, optFunc) 
 ```
-
 
 ```{r optimization, echo=FALSE}
-# if (!(file.exists("optimized.twitter.model") & 
-#         file.exists("optimized.blogs.model") &
-#         file.exists("optimized.news.model"))) {
-#     load("twitter.model")
-#     opt_model <- lapply(model, optFunc)
-#     save(model, file="optimized.twitter.model")
-#     rm(model)
-#     load("blogs.model")
-#     opt_model <- lapply(model, optFunc)
-#     save(model, file="optimized.blogs.model")
-#     rm(model)
-#     load("news.model")
-#     opt_model <- lapply(model, optFunc)
-#     save(model, file="optimized.news.model")
-#     rm(model)
-# }
+if (!(file.exists("optimized.twitter.model") & 
+        file.exists("optimized.blogs.model") &
+        file.exists("optimized.news.model"))) {
+    load("twitter.model")
+    model <- lapply(model, optFunc)
+    save(model, file="optimized.twitter.model")
+    rm(model)
+    load("blogs.model")
+    model <- lapply(model, optFunc)
+    save(model, file="optimized.blogs.model")
+    rm(model)
+    load("news.model")
+    model <- lapply(model, optFunc)
+    model <- opt_model
+    save(model, file="optimized.news.model")
+    rm(model)
+}
 ```
 
-```{r optimization_models, echo=FALSE}
-# load("twitter.model")
-# print("Twitter model length before and after the optimization:")
-# before <- unlist(lapply(model, length))
-# rm(model)
-# load("optimized.twitter.model")
-# after <- unlist(lapply(model, length))
-# res <- data.frame(before=before, after=after)
-# res
-# rm(model, before, after, res)
-# 
-# load("blogs.model")
-# print("Blogs model length before and after the optimization:")
-# before <- unlist(lapply(model, length))
-# rm(model)
-# load("optimized.blogs.model")
-# after <- unlist(lapply(model, length))
-# res <- data.frame(before=before, after=after)
-# res
-# rm(model, before, after, res)
-# 
-# load("news.model")
-# print("News model length before and after the optimization:")
-# before <- unlist(lapply(model, length))
-# rm(model)
-# load("optimized.news.model")
-# after <- unlist(lapply(model, length))
-# res <- data.frame(before=before, after=after)
-# res
-# rm(model, before, after, res)
+Here you can see how the size of models reduced after the optimization:
+
+```{r optimization_models, echo=FALSE, cache=TRUE}
+load("twitter.model")
+print("Twitter model length before and after the optimization:")
+before <- unlist(lapply(model, length))
+rm(model)
+load("optimized.twitter.model")
+after <- unlist(lapply(model, length))
+res <- data.frame(before=before, after=after)
+res
+rm(model, before, after, res)
+
+load("blogs.model")
+print("Blogs model length before and after the optimization:")
+before <- unlist(lapply(model, length))
+rm(model)
+load("optimized.blogs.model")
+after <- unlist(lapply(model, length))
+res <- data.frame(before=before, after=after)
+res
+rm(model, before, after, res)
+
+load("news.model")
+print("News model length before and after the optimization:")
+before <- unlist(lapply(model, length))
+rm(model)
+load("optimized.news.model")
+after <- unlist(lapply(model, length))
+res <- data.frame(before=before, after=after)
+res
+rm(model, before, after, res)
+```
+
+Besides this, another optimization might be done to improve access to data. Next 
+word prediction should be almost instantaneous in our App, because potential
+user will not be waiting for predictions for even small amount of time. Created
+n-gram models are still have many elements in them, and searching for the right one
+might take some time if we just try to access it as is. So we decided to make
+hashing of the models, grouping similar records by the first two characters in the
+n-gram, which makes access to data much more faster.
+
+```{r indexing_func, echo=FALSE}
+makeIndex <- function(ngram) {
+    # takes n-gram vector and creates an index 
+    # that is based on the first 2 characters of n-grams
+    two_chars <- unname(sapply(names(ngram), substr, 1, 2))
+    counts <- table(two_chars)
+    index <- list()
+    start <- 1
+    for (name in names(counts)) {
+        num <- unname(counts[name])
+        start_stop <- c(start, start + num - 1)
+        index[name] <- list(start_stop)
+        start <- start + num
+    }
+    return(index)
+}
+```
+
+```{r indexing, echo=FALSE}
+if (!all(file.exists("blogs.model.hashed", "news.model.hashed", "twitter.model.hashed",
+                 "news.unigram.hashed", "news.unigram.hashed", "news.unigram.hashed"))) {
+    load("blogs.model")
+    model <- lapply(model, function (x) x[order(names(x))])
+    hash <- lapply(model, makeIndex)
+    save(list=c("model", "hash"),  file="blogs.model.hashed")
+    rm(hash, model)
+    load("news.model")
+    model <- lapply(model, function (x) x[order(names(x))])
+    hash <- lapply(model, makeIndex)
+    save(list=c("model", "hash"),  file="news.model.hashed")
+    rm(hash, model)
+    load("twitter.model")
+    model <- lapply(model, function (x) x[order(names(x))])
+    hash <- lapply(model, makeIndex)
+    save(list=c("model", "hash"),  file="twitter.model.hashed")
+    rm(hash, model)
+    
+    load("gram1.news.counts")
+    gram1 <- gram1[gram1 >= 10]
+    gram1 <- gram1[order(names(gram1))]
+    uni_hash <- makeIndex(gram1)
+    save(list=c("gram1", "uni_hash"),  file="news.unigram.hashed")
+    rm(uni_hash, gram1)
+    load("gram1.blogs.counts")
+    gram1 <- gram1[gram1 >= 10]
+    gram1 <- gram1[order(names(gram1))]
+    uni_hash <- makeIndex(gram1)
+    save(list=c("gram1", "uni_hash"),  file="blogs.unigram.hashed")
+    rm(uni_hash, gram1)
+    load("gram1.twitter.counts")
+    gram1 <- gram1[gram1 >= 10]
+    gram1 <- gram1[order(names(gram1))]
+    uni_hash <- makeIndex(gram1)
+    save(list=c("gram1", "uni_hash"),  file="twitter.unigram.hashed")
+    rm(uni_hash, gram1)
+}
 ```
 
 ### Predictive Function
 
+The predictive function uses n-gram models and indexes to predict the most probable next
+words. It produces a prediction that consists of at most 5 words.
+
+When argument clean=TRUE, it also perform text preprocessing before generating predictions 
+(similar to the corpus cleaning during the model-creation process). At the cleaning stage 
+all digits, e-mails and bad-words are replaced with coresponding tokens, and 
+special characters are removed (except the meaningful punctuation marks ".,?."), 
+as well as excessive white-space characters. At the beginning of the text the special 
+tag "\<s\>" is placed.
+
+The predicting part of this function use "backing-off" to the lower n models under conditions when the given model do not produce a good prediction. By doing so, the it produce the most reliable prediction using the best model. It use backing-of from 4 to 3 and 2-gram models.
+
+Smoothing wasn't used for the models, because it produced less accurate predictions than just using simple "backing-off" without smoothing.
+
+Another feature of the particular predictive function is that it's behaviour depends on the 
+last character in the text. When there is a "space" at that position, it includes
+punctuation mark into results, so it also predicts those four important punctuations - ".,!?".
+
+```{r pred_func, echo=FALSE}
+predictNextWord <- function(char, model, hash, unigram, uni_hash, clean=TRUE) {
+    # predicts next 5 most probable words for the character string 
+    
+    # status check if the "space" after the last word in char string was typed
+    initial <- char
+    status <- substr(char, nchar(char), nchar(char)) == " "
+    
+    # cleaning char
+    if (clean) {
+        char <- gsub("[<>]", "", char)
+        char <- gsub("[[:digit:]]+[:.,-][[:digit:]]+", " <digit> ", char)
+        char <- gsub("[[:digit:]]+", " <digit> ", char)
+        char <- gsub("[[:alnum:].-]+@[[:alnum:].-]+", " <e-mail> ", char)
+        for (smile in c("x-p", "o.o", "[=:;][boqje#pds]")) {
+            char <- gsub(smile, "", char)
+            }
+        char <- gsub("\\?+\\!+|\\!+\\?+", "?", char)
+        char <- gsub(";+", ",", char)
+        char <- gsub('[])(:#%$^\\~{}[&+=@/"_]+', "", char)
+        for (punct in c("!", "?", ".", ",")) {
+            pattern <- paste0("\\", punct, "+")
+            replacement <- paste0(" ", punct, " ")
+            char <- gsub(pattern, replacement, char)
+            char <- gsub("\\s+", " ", char)
+            }
+        reg <- " screw | wank[a-z]*|b[o0][o0]bs|l3i[a-z]ch|knob|or[ia]f[ai][cs]|[a-z]damn |d[iy]ck|q[uw]e[ei]r| arse|[ck]awk| gay|retard|s[kc]anc*k|t[ie]+t[sz]|slut|puss[ye]|vul+va|vag*[i1]*j*i*na|pola[ck]|phu[ck]|pe[ie]*n[a1iu]+s|pac*k[iy]| anal | anus |butt[wh-]|clit|crap|pu[tl][eao] |jar*c*k[\\s-]*off|blow\\s*job|ji[zs]+|nazi|w*h[o0]+a*r|a[s]*h[o0]le|sh[i1!y]t|mas+t[eu]*rbai*t|n[i1]+g+[eu]*r| a[sz][sz]|bas+t[ae]rd|b[!i1][a7]*tch|c[o0]ck| cum |[ck]u*nt|dild[a-z]*|f\\s*u\\s*c*\\s*k|fai*g"
+        char <- gsub(reg, " <badword> ", char)
+        char <- gsub("^\\s+|\\s+$", "", char)
+        char <- gsub("\\s+", " ", char)
+        char <- paste("<s>", char)
+    }
+    last_three_words <- tail(strsplit(tolower(char), split=" ")[[1]], 3)
+    first_two_chars_last_word <- substr(tail(last_three_words, 1), 1, 2)
+    
+    # getting top predictions
+    res <- character(0)
+    to_prediction <- paste(last_three_words, collapse=" ")
+    if (length(last_three_words) == 3) {
+        # try 4-gram
+        two_chars <- substr(to_prediction, 1, 2)
+        start_stop <- hash$fourgram[[two_chars]]
+        if (!is.null(start_stop)) {
+            indexes <- grep(paste0("^", to_prediction, " "), 
+                            names(model$fourgram[start_stop[1]:start_stop[2]]))
+            if (length(indexes) != 0) {
+                res <- c(res, head(sort(model$fourgram[start_stop[1]:start_stop[2]][indexes],
+                                        decreasing=TRUE), 15))
+            }
+        }
+    }
+    if (length(last_three_words) >= 2) {
+        # try 3-gram
+        to_prediction <- paste(tail(last_three_words, 2), collapse=" ")
+        two_chars <- substr(to_prediction, 1, 2)
+        start_stop <- hash$threegram[[two_chars]]
+        if (!is.null(start_stop)) {
+            indexes <- grep(paste0("^", paste(to_prediction, collapse=" "), " "), 
+                            names(model$threegram[start_stop[1]:start_stop[2]]))
+            if (length(indexes) != 0) {
+                res <- c(res, head(sort(model$threegram[start_stop[1]:start_stop[2]][indexes],
+                                        decreasing=TRUE), 15))
+            }
+        }
+    }
+    # try 2-gram
+    to_prediction <- paste(tail(last_three_words, 1), collapse=" ")
+    two_chars <- substr(to_prediction, 1, 2)
+    if (nchar(two_chars) != 2) {
+        two_chars <- paste0(two_chars, " ")
+    }
+    start_stop <- hash$bigram[[two_chars]]
+    if (!is.null(start_stop)) {
+        indexes <- grep(paste0("^", to_prediction, " "), 
+                        names(model$bigram[start_stop[1]:start_stop[2]]))
+        if (length(indexes) != 0) {
+            res <- c(res, head(sort(model$bigram[start_stop[1]:start_stop[2]][indexes], 
+                                    decreasing=TRUE), 15)) 
+        }
+    }
+    
+    # processing output
+    res <- names(res)
+    res <- sapply(res, function(x) tail(strsplit(x, split=" ")[[1]], 1))
+    res <- res[!res %in% c("<digit>", "<badword>", "<e-mail>")]
+    if (status) {
+        res <- res[!res %in% c("?", "!", ",", ".")]
+    } else {
+        if (nchar(initial) > 0) {
+            res[!res %in% c("?", "!", ",", ".")] <- paste0(" ", res[!res %in% c("?", 
+                                                                                "!", 
+                                                                                ",", 
+                                                                                ".")])
+        }
+#         start_stop <- uni_hash[[first_two_chars_last_word]] # word completing, for App only
+#         if (!tail(last_three_words, 1) %in% names(unigram[start_stop[1]:start_stop[2]])) {
+#             print(tail(last_three_words, 1)) # for the application only
+#             ind <- grep(paste0("^", tail(last_three_words, 1)),
+#                         names(unigram[start_stop[1]:start_stop[2]]))
+#             res <- unigram[start_stop[1]:start_stop[2]][ind]
+#             res <- head(names(sort(res, decreasing=TRUE)), 5)
+#             res <- gsub(tail(last_three_words, 1), "", res)
+#         }
+    }
+    res <- unique(unname(head(res, 5)))
+    ind <- logical(0)
+    for (item in res) {
+        word_chars <- strsplit(item, split="")
+        ind <- c(ind, all(sapply(word_chars, 
+                                 function(x) x %in% c(letters, "?", "!", ",", ".", " "))))
+    }
+    return(res[ind])
+}
+
+```
+
+Lets try to predict the next words for the 4-grams from the phrase:
+
+"The alacrity of the brown fox contributes to its ability to perform a saltationary action over the lazy dog"
+
+
+```{r pred, echo=FALSE}
+load("blogs.model.hashed")
+load("blogs.unigram.hashed")
+phrase <- "The alacrity of the brown fox contributes to its ability to perform a saltationary action over the lazy dog"
+four_grams <- character(0)
+tokens <- strsplit(phrase, split=" ")[[1]]
+for (index in 1:(length(tokens)-3)) {
+    four_grams <- c(four_grams, paste(tokens[index:(index+3)], collapse=" "))
+}
+for (gram4 in four_grams) {
+    print(gram4)
+    print(predictNextWord(gram4, model, hash, gram1, uni_hash))
+    print(system.time(predictNextWord(gram4, model, hash, gram1, uni_hash)))
+    print("----------------------------------------------------")
+}
+```
+
+As we can see, the predictive function works, but to evaluate the accuracy of 
+predictions, large scale accuracy tests should be performed. They will be described in
+more detail in the next segment of this report.
+
 ### Performance Testing
 
+To calculate how well the models perform, we used the parts of files that was considered
+as the test sets, and which have not been used for the models creation:
+
+1. en_US.twitter.txt - last 360,148 lines of the file
+2. en_US.blogs.txt - last 149,288 lines of the file
+3. en_US.news.txt - last 210,238 lines of the file
+
+To obtain the accuracy of the word prediction algorithm the following steps was performed:
+
+1. 4-grams and their counts was generated from test sets.
+2. There were randomly sampled 1000 4-grams from each set for testing.
+3. Each 4-gram was separated on the first 3 words (which were used for prediction) and a last word (to compare result with).
+4. The prediction of at most 5 words was generated using the predicting function, and the real last word from 4-gram was looked in vector with predictions. This produced True or 
+False (1 or 0) prediction for each 4-gram.
+5. The results (0 or 1) for each particular 4-gram was multiplied by the counts for it. After doing this for all 4-grams, the counts for all 4-gram were summed and compared to their sum before running these tests. We did this because not every 4-gram have the same weight for our ability to predict, and their counts represents frequencies of them in the real data. So their counts were used as weights. For instance, 4-gram with count 100 will happen 100 times more frequently than 4-gram with count 1, and it also will be 100 times more valuable for prediction.
+
+Here are the results of prediction accuracy for all three models (models were tested in context of the data - twitter test set was used for the twitter model testing, etc.):
+
+```{r gram4_testing, echo=FALSE}
+if (!all(file.exists("testing.twitter", "testing.blogs", "testing.news"))) {
+    files <- grep("ngram_", dir(), value=TRUE)
+    file.remove(files)
+    
+    parseData("en_US.news.txt", chunksize=100, start_from=8001, end_at=100000)
+    separateNgramFiles(grep("ngram_", dir(), value=TRUE))
+    files <- grep("ngram_[[:digit:]]+_[123]", dir(), value=TRUE)
+    file.remove(files)
+    mergeAll(4)
+    files <- grep("ngram_", dir(), value=TRUE)
+    load(files)
+    testing <- gram4
+    rm(gram4)
+    save(testing, file="testing.news")
+    file.remove(files)
+    
+    parseData("en_US.twitter.txt", chunksize=500, start_from=4001, end_at=4000)
+    separateNgramFiles(grep("ngram_", dir(), value=TRUE))
+    files <- grep("ngram_[[:digit:]]+_[123]", dir(), value=TRUE)
+    file.remove(files)
+    mergeAll(4)
+    files <- grep("ngram_", dir(), value=TRUE)
+    load(files)
+    testing <- gram4
+    rm(gram4)
+    save(testing, file="testing.twitter")
+    file.remove(files)
+    
+    parseData("en_US.blogs.txt", chunksize=50, start_from=15001, end_at=15000)
+    separateNgramFiles(grep("ngram_", dir(), value=TRUE))
+    files <- grep("ngram_[[:digit:]]+_[123]", dir(), value=TRUE)
+    file.remove(files)
+    mergeAll(4)
+    files <- grep("ngram_", dir(), value=TRUE)
+    load(files)
+    testing <- gram4
+    rm(gram4)
+    save(testing, file="testing.blogs")
+    file.remove(files)
+}
+```
+
+```{r testing, echo=FALSE}
+
+if (!all(file.exists("testing.twitter", "testing.news", "testing.blogs"))) {
+    load("testing.news")
+    set.seed(777)
+    testing <- sample(testing, 1000)
+    load("news.model.hashed")
+    load("news.unigram.hashed")
+    testing <- sort(testing, decreasing=TRUE)
+    before <- sum(testing)
+    count <- 0
+    for (index in 1:length(testing)) {
+        item <- testing[index]
+        name <- strsplit(names(item), split=" ")[[1]]
+        last_word <- tail(name, 1)
+        name <- paste0(paste(name[1:length(name)-1], collapse=" "), " ")
+        predictions <- predictNextWord(name, model, hash, gram1, uni_hash, clean=FALSE)
+        result <- as.numeric(last_word %in% predictions)
+        item <- item * result
+        testing[index] <- item
+        count <- count + 1
+        if (count %% 10 == 0) print(paste(count, "n-grams evaluated", date()))
+        }
+    after <- sum(testing)
+    accuracy <- after / before
+    print("Word prediction accuracy for news n-gram model:")
+    accuracy
+    save(accuracy, file="news.accuracy")
+    
+    
+    load("testing.blogs")
+    testing <- sample(testing, 1000)
+    load("blogs.model.hashed")
+    load("blogs.unigram.hashed")
+    testing <- sort(testing, decreasing=TRUE)
+    before <- sum(testing)
+    count <- 0
+    for (index in 571:length(testing)) {
+        item <- testing[index]
+        name <- strsplit(names(item), split=" ")[[1]]
+        last_word <- tail(name, 1)
+        name <- paste0(paste(name[1:length(name)-1], collapse=" "), " ")
+        predictions <- predictNextWord(name, model, hash, gram1, uni_hash, clean=FALSE)
+        result <- as.numeric(last_word %in% predictions)
+        item <- item * result
+        testing[index] <- item
+        count <- count + 1
+        if (count %% 10 == 0) print(paste(count, "n-grams evaluated", date()))
+        }
+    after <- sum(testing)
+    accuracy <- after / before
+    print("Word prediction accuracy for blogs n-gram model:")
+    accuracy
+    save(accuracy, file="blogs.accuracy")
+
+    
+    load("testing.twitter")
+    testing <- sample(testing, 1000)
+    load("twitter.model.hashed")
+    load("twitter.unigram.hashed")
+    testing <- sort(testing, decreasing=TRUE)
+    before <- sum(testing)
+    count <- 0
+    for (index in 1:length(testing)) {
+        item <- testing[index]
+        name <- strsplit(names(item), split=" ")[[1]]
+        last_word <- tail(name, 1)
+        name <- paste0(paste(name[1:length(name)-1], collapse=" "), " ")
+        predictions <- predictNextWord(name, model, hash, gram1, uni_hash, clean=FALSE)
+        result <- as.numeric(last_word %in% predictions)
+        item <- item * result
+        testing[index] <- item
+        count <- count + 1
+        if (count %% 10 == 0) print(paste(count, "n-grams evaluated", date()))
+        }
+    after <- sum(testing)
+    accuracy <- after / before
+    print("Word prediction accuracy for twitter n-gram model:")
+    accuracy
+    save(accuracy, file="twitter.accuracy")
+
+    
+} else {
+    load("news.accuracy")
+    print("Word prediction accuracy for news n-gram model:")
+    print(accuracy)
+    
+    load("blogs.accuracy")
+    print("Word prediction accuracy for blogs n-gram model:")
+    print(accuracy)
+    
+    load("twitter.accuracy")
+    print("Word prediction accuracy for twitter n-gram model:")
+    print(accuracy)
+}
+```
+
 ## Web Application
+
+Based on the obtained predictive function and optimized models, the demonstrational 
+Web application was created. Here are some features of it's functionality:
+
++ It predicts the most probable next words using back-off n-gram model
++ Prediction consists of 5 words or less to choose the right one by user
++ The are possibility to choose one of three different modes of writing (twitter, news, blog) for different kinds of texts 
++ When user types just a part of word the application is trying to predict and complete the word
++ While the application does not predict profane words, bad-words can be in the user's text and they generally do not affect the the quality of the next words prediction
++ App includes punctuation marks to prediction when the last character in the user's text is not a "space" character
++ The predictions are not affected by the proximity of the document start. App will try to predict the next word even if the document is empty
++ It can predict words that follow after e-mails or digits. Also it predicts abbreviations like U.S., p.m. and others.
+
+The application can be accessed here:
+[Under Development]()

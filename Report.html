@@ -8,6 +8,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
 
+<meta name="author" content="Mykola Steshenko" />
 
 
 <title>Building a Predictive Text Model for Words Prediction in Twitter, News, and Blogs Texts</title>
@@ -52,11 +53,13 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 
 <div id="header">
 <h1 class="title">Building a Predictive Text Model for Words Prediction in Twitter, News, and Blogs Texts</h1>
+<h4 class="author"><em>Mykola Steshenko</em></h4>
 </div>
 
 
 <div id="synopsis" class="section level2">
 <h2>Synopsis</h2>
+<p>The obsession of smartphones and other mobile devices has significantly affected our life, and we spend much time typing different kinds of texts in them. The typing still remains very unconvinient due to the sizes of devices, their virtual keyboards, sensor monitors and some other reasons. Smart keyboards can improve effeciency of this proccess considerably, reducing the amount of typing by a factor of 2 or even more. The main goal of this project is to develope predictive text model for such keyboard, which will be able to predict the most probable next words for twitter, news, and blogs texts. After that, this model will be implemented into a demonstrational Web application.</p>
 </div>
 <div id="data" class="section level2">
 <h2>Data</h2>
@@ -84,64 +87,14 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 <p>The raw data contains upper-case letters, punctuation marks, textual emotion expressions (different kinds of smiles), digits, e-mails, hash-tags, offensive and profane words, duplicated symbols, and some other special symbols that should be handled before further processing. It is expected that data from Twitter have much more issues like these. Due to this fact, twitter predictive model also might have worse performance than other models, while data from blogs and news has been written in much more clear way. Libraries “tm” and “stringi” were used for data cleaning. At the first step of cleaning process all documents in corpus were transformed to the lower case. After that symbols “&gt;” and “&lt;” were removed, which might be useful later as special tags. At the next step all digits and combinations of digits where digits separated with one of special symbols (“:,.-”) were replaced with tag “&lt;digit&gt;”, because an exact value of them can’t be useful in prediction model. Also all e-mails were replaced with tag “&lt;e-mail&gt;” for the same reasons. After that some smiles like “:-P” that might produce single letter token after the special symbols deletion were removed.</p>
 <p>Another important procedure in data cleaning process is handling of punctuation marks and other special symbols that might be meaningful. For instance, we can’t just remove symbols like “-” and different kinds of apostrophes, because they play important role in some combined words like “I’m”, “don’t”, “e-mail”, etc. Also we can’t remove all meaningful punctuation marks (“,.?!”), which might cause full chaos in corpus and produce n-grams that normally do not appear in sentence. Before handling punctuations, symbol “;” was replaced with “,” due to the close meaning. We decided to left punctuation marks “,.?!” and treat them like separate words in our prediction model, because in this case they can be used for punctuation prediction, while they can be easily filtered when there is no need in them. After handling these special symbols all other symbols “):#%$^\~}&amp;+=@/&quot;_]+” were removed.</p>
 <p>We did not remove hash-tags but only hash-tag symbols, because they usually are meaningful. Also we decided not to remove stop words from corpus. For more convenience all the cleaning procedures described above were placed into one function, that was used in data parser later:</p>
-<pre class="r"><code>cleanCorpus &lt;- function(corpus) {
-    # Makes some cleaning and symbol handling procedures for tm corpus of textdata
-    library(tm)
-    library(stringi)
-    # Case correction
-    corpus  &lt;- tm_map(corpus, function(x) stri_trans_tolower(x[[1]]))
-    # Remove tags
-    corpus  &lt;- tm_map(corpus, function (x) gsub(&quot;[&lt;&gt;]&quot;, &quot;&quot;, x[[1]]))
-    # digits replacement
-    corpus  &lt;- tm_map(corpus, function (x) gsub(&quot;[[:digit:]]+[:.,-][[:digit:]]+&quot;, &quot; &lt;digit&gt; &quot;, x[[1]]))
-    corpus  &lt;- tm_map(corpus, function (x) gsub(&quot;[[:digit:]]+&quot;, &quot; &lt;digit&gt; &quot;, x[[1]]))
-    # email replacement
-    corpus  &lt;- tm_map(corpus, function (x) gsub(&quot;[[:alnum:].-]+@[[:alnum:].-]+&quot;, &quot; &lt;e-mail&gt; &quot;, x[[1]]))
-    # remove some smiles that might left standalone alphabetic symbols after deletion
-    for (smile in c(&quot;x-p&quot;, &quot;o.o&quot;, &quot;[-=:;][boqje#pds]&quot;, &quot;&lt;3&quot;)) {
-        corpus  &lt;- tm_map(corpus, function (x) gsub(smile, &quot;&quot;, x[[1]]))
-    }
-    # replace ?!?!?!?! and ;
-    corpus  &lt;- tm_map(corpus, function (x) gsub(&quot;\\?+\\!+|\\!+\\?+&quot;, &quot;?&quot;, x[[1]]))
-    corpus  &lt;- tm_map(corpus, function (x) gsub(&quot;;+&quot;, &quot;,&quot;, x[[1]]))
-    # remove duplicates of important punctuation and add spacing
-    for (punct in c(&quot;!&quot;, &quot;?&quot;, &quot;.&quot;, &quot;,&quot;)) {
-        pattern &lt;- paste0(&quot;\\&quot;, punct, &quot;+&quot;)
-        replacement &lt;- paste0(&quot; &quot;, punct, &quot; &quot;)
-        corpus  &lt;- tm_map(corpus, function (x) gsub(pattern, replacement, x[[1]]))
-    }
-    # remove other punctuation
-    corpus  &lt;- tm_map(corpus, function (x) gsub('[])(:#%$^\\~{}[&amp;+=@/&quot;_]+', &quot;&quot;, x[[1]]))
-    return(corpus)
-}</code></pre>
 </div>
 <div id="profanity-filtering" class="section level4">
 <h4>Profanity Filtering</h4>
 <p>Another important task in data cleaning is removing offensive and profane words, because we usually do not want to predict them. Just deleting these words might cause some problems with text consistency, so we replaced them with special tag “&lt;badword&gt;”. The universal regular expression for the most common profane words was created using freely available <a href="http://urbanoalvarez.es/blog/2008/04/04/bad-words-list/">bad-words dictionary</a>. It was used later in special bad-word handling function:</p>
-<pre class="r"><code>badWordHandle &lt;- function(corpus) {
-    # Change most frequent badwords to &lt;badword&gt; tag
-    reg &lt;- &quot; screw | wank[a-z]*|b[o0][o0]bs|l3i[a-z]ch|knob|or[ia]f[ai][cs]|[a-z]damn |d[iy]ck|q[uw]e[ei]r| arse|[ck]awk| gay|retard|s[kc]anc*k|t[ie]+t[sz]|slut|puss[ye]|vul+va|vag*[i1]*j*i*na|pola[ck]|phu[ck]|pe[ie]*n[a1iu]+s|pac*k[iy]| anal | anus |butt[wh-]|clit|crap|pu[tl][eao] |jar*c*k[\\s-]*off|blow\\s*job|ji[zs]+|nazi|w*h[o0]+a*r|a[s]*h[o0]le|sh[i1!y]t|mas+t[eu]*rbai*t|n[i1]+g+[eu]*r| a[sz][sz]|bas+t[ae]rd|b[!i1][a7]*tch|c[o0]ck| cum |[ck]u*nt|dild[a-z]*|f\\s*u\\s*c*\\s*k|fai*g&quot;
-    corpus  &lt;- tm_map(corpus, function (x) gsub(reg, &quot; &lt;badword&gt; &quot;, x[[1]]))
-    return(corpus)
-}</code></pre>
 </div>
 <div id="white-space-trim-and-empty-string-deletion" class="section level4">
 <h4>White-space trim and empty string deletion</h4>
 <p>At the next step of data processing the white-space correction was performed. Firstly, all white-space characters at the beginning and at the end of each document should be removed, as well as duplicates of them in text. Secondly, empty strings have to be deleted from corpus. Finally, special tag “&lt;s&gt;”, which means start of the document, should be placed at the beginning of each document in a corpus. We do this for the reason to be able to predict words at the beginning of the text, when there were no words printed yet. All these white-space processing procedures were placed into one function, that will be used in parser later:</p>
-<pre class="r"><code>whiteSpaceCorrection &lt;- function(corpus) {
-    # Provides end/begin whitespace trimming an removing of whitespace duplicates
-    corpus  &lt;- tm_map(corpus, function (x) gsub(&quot;^\\s+|\\s+$&quot;, &quot;&quot;, x[[1]]))
-    # remove 1+ spaces
-    corpus  &lt;- tm_map(corpus, function (x) gsub(&quot;\\s+&quot;, &quot; &quot;, x[[1]]))
-    # empty string deletion
-    item_length &lt;- tm_map(corpus, function (x) nchar(x[[1]]))
-    item_length &lt;- unlist(item_length)
-    idx &lt;- item_length == 0
-    corpus &lt;- corpus[!idx]
-    # starting each document with special tag &quot;&lt;s&gt; &quot;
-    corpus  &lt;- tm_map(corpus, function (x) paste(&quot;&lt;s&gt;&quot;, x[[1]]))
-    return(corpus)
-}</code></pre>
 </div>
 </div>
 <div id="n-gram-counts" class="section level3">
@@ -150,202 +103,12 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 <div id="map-phase" class="section level4">
 <h4>Map Phase</h4>
 <p>N-grams was counted with this function that takes a small chunk of data as an input and writes 1, 2, 3 and 4-grams counts to global storage objects:</p>
-<pre class="r"><code>n_gramCount &lt;- function (data) {
-    # writes counts of all possible 1, 2, 3 and 4 grams from corpus to 
-    # global ngram storage objects &quot;gram1&quot;, &quot;gram2&quot;, &quot;gram3&quot;, &quot;gram4&quot;
-#     count &lt;&lt;- count + 1
-#     if (count %% 100 == 0) {      # performance testing
-#         print(paste(count, &quot;documents evaluated&quot;, date()))
-#     }
-    onegrams &lt;- strsplit(data, split=&quot; &quot;)[[1]]
-    for (index in 1:length(onegrams)) {
-        # 1-gram count
-        word1 &lt;- onegrams[index]
-        value &lt;- gram1[[word1]]
-        if (!is.null(value)) {
-            gram1[[word1]] &lt;&lt;- value + 1
-        } else {
-            gram1[[word1]] &lt;&lt;- 1
-        }
-        # 2-gram count
-        word2 &lt;- onegrams[index + 1]
-        if (!is.na(word2)) {
-            twogram &lt;- paste(word1, word2)
-            value &lt;- gram2[[twogram]]
-            if (!is.null(value)) {
-                gram2[[twogram]] &lt;&lt;- value + 1
-            } else {
-                gram2[[twogram]] &lt;&lt;- 1
-            }
-        }
-        # 3-gram count
-        word3 &lt;- onegrams[index + 2]
-        if (!is.na(word3)) {
-            threegram &lt;- paste(word1, word2, word3)
-            value &lt;- gram3[[threegram]]
-            if (!is.null(value)) {
-                gram3[[threegram]] &lt;&lt;- value + 1
-            } else {
-                gram3[[threegram]] &lt;&lt;- 1
-            }
-        }
-        # 4-gram count
-        word4 &lt;- onegrams[index + 3]
-        if (!is.na(word4)) {
-            fourgram &lt;- paste(word1, word2, word3, word4)
-            value &lt;- gram4[[fourgram]]
-            if (!is.null(value)) {
-                gram4[[fourgram]] &lt;&lt;- value + 1
-            } else {
-                gram4[[fourgram]] &lt;&lt;- 1
-            }
-        }
-    }
-}</code></pre>
 <p>Also was created a higher level parser function that takes a name of file, size of chunk, starting and end points for data parsing as input. It use previous function to count n-grams and store them to hard disk drive into a single file for each chunk.</p>
-<pre class="r"><code>parseData &lt;- function(filename, chunksize=1000, start_from=1, end_at=4000) {
-    # This function takes file with raw data by small chunks and
-    # provides data cleaning, counting n-grams and storing them into files
-    library(tm)
-    con &lt;- file(filename, open=&quot;rb&quot;)
-    num &lt;- 0
-    ngram_list &lt;- grep(&quot;ngram&quot;, dir(), value=TRUE)
-    if (length(ngram_list) != 0) {
-        last_file_done &lt;- max(as.integer(unlist(sapply(strsplit(ngram_list, split=&quot;_&quot;), function (x) {x[2]}))))
-    } else {
-        last_file_done &lt;- 0
-    }
-#     print(paste(&quot;Started at&quot;, date()))
-    while (length(data &lt;- readLines(con, chunksize, encoding=&quot;utf-8&quot;, skipNul=TRUE)) &gt; 0 &amp; num &lt; end_at) {
-        if (num + 1 &gt; last_file_done &amp; num + 1 &gt;= start_from) {
-            corpus &lt;- VCorpus(VectorSource(data), readerControl=list(reader=readPlain, language=&quot;en&quot;))
-            corpus &lt;- cleanCorpus(corpus)
-            corpus &lt;- badWordHandle(corpus)
-            corpus &lt;- whiteSpaceCorrection(corpus)
-            gram1 &lt;&lt;- list()
-            gram2 &lt;&lt;- list()
-            gram3 &lt;&lt;- list()
-            gram4 &lt;&lt;- list()
-            res &lt;- sapply(corpus, function (x) n_gramCount(x[[1]]))
-            gram1 &lt;&lt;- unlist(gram1)
-            gram2 &lt;&lt;- unlist(gram2)
-            gram3 &lt;&lt;- unlist(gram3)
-            gram4 &lt;&lt;- unlist(gram4)
-            rm(res)
-            save(gram1, gram2, gram3, gram4, file=paste0(&quot;ngram_&quot;, num+1))
-#             print(paste(&quot;Elements from&quot;, (num)*chunksize, &quot;to&quot;, (num+1)*chunksize, &quot;were evaluated&quot;, date()))  # performance testing
-        }
-        num &lt;- num + 1
-    }
-    close(con)
-}</code></pre>
 <p>We decided to count n-grams and to create the prediction model for each file separately. There are some reasons for that, and the main is that prediction models are good only in context of the data. While we still can use model from blog corpus to predict words in context of news, we definitely can’t do this for twitter data. They are very different and accuracy of this predictive model will be not very high. So we decided to create three different models for each context (news, blogs and twitter).</p>
 </div>
 <div id="reduce-phase" class="section level4">
 <h4>Reduce Phase</h4>
 <p>In the reduce phase we reduced all the n-grams counts from the all files created in the map phase. Three different functions was created to perform this. The first one splits files with 1, 2, 3 and 4-gram counts into four separate files. Second takes two files with n-gram counts of the same rank and merge them together. And the third one is a higher level function that goes over all of files with n-gram counts and merge them for the given n.</p>
-<pre class="r"><code>separateNgramFiles &lt;- function(filenames_list) {
-    # Separate composit ngram files to files that contains only one type of ngrams
-    count &lt;- 0
-    for (name in filenames_list) {
-        load(name)
-        save(gram1, file=paste0(name, &quot;_1&quot;))
-        save(gram2, file=paste0(name, &quot;_2&quot;))
-        save(gram3, file=paste0(name, &quot;_3&quot;))
-        save(gram4, file=paste0(name, &quot;_4&quot;))
-        count &lt;- count + 1
-#         if (count %% 10 == 0) {  # performance testing
-#             print(paste(count, &quot;files were processed&quot;))
-#         }
-        file.remove(name)
-    }
-}
-
-
-mergeNgramFiles &lt;- function(a, b) {
-    # merge two n-gram files
-    n &lt;- substr(a, nchar(a), nchar(a))
-    load(a)
-    if (n == 1) {
-        first &lt;- gram1
-        rm(gram1)
-    } else if (n == 2) {
-        first &lt;- gram2
-        rm(gram2)
-    } else if (n == 3) {
-        first &lt;- gram3
-        rm(gram3)
-    } else {
-        first &lt;- gram4
-        rm(gram4)
-    }
-    load(b)
-    if (n == 1) {
-        second &lt;- gram1
-        rm(gram1)
-    } else if (n == 2) {
-        second &lt;- gram2
-        rm(gram2)
-    } else if (n == 3) {
-        second &lt;- gram3
-        rm(gram3)
-    } else {
-        second &lt;- gram4
-        rm(gram4)
-    }
-    unique_names &lt;- unique(c(names(first), names(second)))
-    empty &lt;- integer(length(unique_names))
-    names(empty) &lt;- unique_names
-    ad &lt;- data.frame(empty, empty)
-    ad[names(first), 1] &lt;- first
-    ad[names(second), 2] &lt;- second
-    result &lt;- rowSums(ad)
-    file.remove(a)
-    file.remove(b)
-    if (n == 1) {
-        gram1 &lt;- result
-        rm(result)
-        save(gram1, file=a)
-    } else if (n == 2) {
-        gram2 &lt;- result
-        rm(result)
-        save(gram2, file=a)
-    } else if (n == 3) {
-        gram3 &lt;- result
-        rm(result)
-        save(gram3, file=a)
-    } else {
-        gram4 &lt;- result
-        rm(result)
-        save(gram4, file=a)
-    }
-    
-}
-
-
-mergeAll &lt;- function(n) {
-    # Merge all n-gram files for the given n
-    files &lt;- grep(paste0(&quot;ngram_[[:digit:]]+_&quot;, n), dir(), value=TRUE)
-    file_info &lt;- file.info(dir())
-    too_big &lt;- file_info$size
-    names(too_big) &lt;- rownames(file_info)
-    too_big &lt;- names(too_big[too_big &gt; 6e7])
-    files &lt;- setdiff(files, too_big)
-    while (length(files) &gt; 1) {
-        files &lt;- grep(paste0(&quot;ngram_[[:digit:]]+_&quot;, n), dir(), value=TRUE)
-        file_info &lt;- file.info(dir())
-        too_big &lt;- file_info$size
-        names(too_big) &lt;- rownames(file_info)
-        too_big &lt;- names(too_big[too_big &gt; 6e7])
-        files &lt;- setdiff(files, too_big)
-        if (length(files) &gt; 1) {
-            indexes &lt;- seq(from=1, to=length(files)-1, by=2)
-            for (index in indexes) {
-                mergeNgramFiles(files[index], files[index+1])
-            }
-        }
-    }
-}</code></pre>
 </div>
 <div id="n-gram-counts-optimization" class="section level4">
 <h4>n-gram Counts Optimization</h4>
@@ -358,13 +121,6 @@ mergeAll &lt;- function(n) {
 <li>roughly top 45% 3-grams contain 50% of counts and top 89% contain 90% of counts</li>
 </ul>
 <p>Even for 3-grams counts are distributed almost uniformly. This was expected because there are more possible combinations for n-grams with bigger n , and we do not have enough data to make a good coverage for all 3 and 4-grams. That is why removing n-grams with the count 1 might be not the best choice in the case of 4-grams. Despite this fact we decided to remove all n-grams with counts 1 for every n to improve performance. This was done with function:</p>
-<pre class="r"><code>reduceOneCounters &lt;- function(ngram) {
-    # reduce n-grams deleting one-counters
-    ngram &lt;- sort(unlist(ngram), decreasing=TRUE)
-    idx &lt;- ngram == 1
-    ngram &lt;- ngram[!idx]
-    return(ngram)
-}</code></pre>
 </div>
 </div>
 </div>
@@ -420,94 +176,162 @@ mergeAll &lt;- function(n) {
 <h2>Predictive Model</h2>
 <div id="probability-model" class="section level3">
 <h3>Probability model</h3>
-<p>N-gram counts were transformed into probabilities to have the last word in n-gram given the previous words from n-gram. For each n-gram this probability might be calculated as count of n-gram divided by count of (n-1)-gram (n-gram without the last word). Here is the function that calculates these probabilities for 2, 3 and 4-grams evaluating them in chunks of 50000 to improve performance:</p>
-<pre class="r"><code>getProbability &lt;- function(counts, ngram_minus_one) {
-    # calculates conditional probability of having the last word in n-gram
-    # given the rest of n-gram
-    xgram &lt;- integer(0)
-    for (index in 1:length(counts)) {
-        item &lt;- counts[index]
-        name &lt;- names(item)
-        splitted &lt;- strsplit(name, split=&quot; &quot;)[[1]]
-        name_minus_one &lt;- splitted[1:length(splitted)-1]
-        xgram &lt;- c(xgram, item[[1]] / ngram_minus_one[[paste(name_minus_one, collapse=&quot; &quot;)]])
-        if (index %% 50000 == 0){
-#             print(paste(index, &quot;elements was evaluated&quot;, date())) # performance testing
-            save(xgram, file=paste0(&quot;temp.file_&quot;, index))
-            xgram &lt;- integer(0)
-        }
-    }
-    save(xgram, file=paste0(&quot;temp.file_&quot;, index))
-    rm(xgram)
-    files_to_collapse &lt;- grep(&quot;temp.file_&quot;, dir(), value=TRUE)
-    files_to_collapse &lt;- files_to_collapse[order(as.numeric(gsub(&quot;temp.file_&quot;, &quot;&quot;, files_to_collapse)))]
-    result &lt;- integer(0)
-    for (file in files_to_collapse) {
-        load(file)
-        result &lt;- c(result, xgram)
-        rm(xgram)
-    }
-    names(result) &lt;- names(counts)
-    file.remove(files_to_collapse)
-    return(result)
-}</code></pre>
+<p>N-gram counts were transformed into probabilities to have the last word in n-gram given the previous words. For each n-gram this probability might be calculated as the count of the particular n-gram divided on the count of (n-1)-gram (the same n-gram but without the last word). Here is the function that calculates these probabilities for 2, 3 and 4-grams evaluating them in chunks of 50000 to improve performance:</p>
 <p>After calculating probabilities for each n-gram, they were placed into the model objects (three objects separately for twits, news, and blogs).</p>
 </div>
 <div id="optimization" class="section level3">
 <h3>Optimization</h3>
-<p>Optimization is heavily dependant on the requirements for the final product. So we should describe how the final Web application expected to perform. It have to contain text input form, where user should type or paste the text. Data from this form is processed with predictive function that returns most probable next words using our n-gram models. It also might return more than one word, but some reasonable number of words to give a possibility to choice the right one by user itself. The goal of this application is to reduce the amount of typing, because it might be not very convenient when using mobile devices. So giving 5 most probable next words to a user should be a reasonable number of items to choice from. Five items is not to many and could be easily showed at a mobile device screen, while it also give some space for selection.</p>
-<p>Taking to consideration provided description of the final product, we can think how our predictive models might be optimized. We do not require more than 5 predictions for each input text so we can reduce the size of models by deleting all predictions beside the top-5 for each n-gram (without counting the punctuation marks, they will be treated separately by the predictive function), because they will never appear in predictions. So at the end we should have predictive models with no more than 5 predictions for each n-gram, plus any predictions of punctuation marks.</p>
-<pre class="r"><code>optFunc &lt;- function(ngram){
-    n &lt;- length(strsplit(names(ngram[1]), split=&quot; &quot;)[[1]])
-    one_ind &lt;- ngram == 1
-    one_part &lt;- ngram[one_ind]
-    ngram &lt;- ngram[!one_ind]
-    ngram &lt;- rev(ngram)
-    print(length(ngram))
-    index &lt;- 1
-    removed &lt;- 0
-    while (!is.na(item &lt;- ngram[index])){
-        to_find &lt;- strsplit(names(item), split=&quot; &quot;)[[1]]
-        for (punct in c(&quot;!&quot;, &quot;?&quot;, &quot;.&quot;, &quot;,&quot;)) {
-            pattern &lt;- paste0(&quot;\\&quot;, punct)
-            replacement &lt;- paste0(&quot;\\\\&quot;, punct)
-            to_find  &lt;- gsub(pattern, replacement, to_find)
-        }
-        to_find &lt;- paste(to_find[1:(length(to_find)-1)], collapse=&quot; &quot;)
-        print(to_find)
-        indexes &lt;- grep(paste0(&quot;^&quot;, to_find, &quot; &quot;), names(ngram))
-        print(paste(&quot;Number of objects&quot;, length(indexes)))
-        item_names &lt;- names(ngram[indexes])
-        last_words &lt;- unlist(lapply(item_names, function(x) strsplit(x, split=&quot; &quot;)[[1]][n]))
-        last_words &lt;- !last_words %in% c(&quot;.&quot;, &quot;!&quot;, &quot;,&quot;, &quot;?&quot;)
-        indexes &lt;- rev(indexes[last_words])
-        print(ngram[head(indexes, 5)])
-        to_remove &lt;- setdiff(indexes, head(indexes, 5))
-        removed &lt;- removed + length(to_remove)
-        print(paste(&quot;Number of objects to remove&quot;, length(to_remove)))
-        if (length(to_remove) &gt; 0){ 
-            ngram &lt;- ngram[-to_remove]
-            print(length(ngram))
-        } else {
-            index &lt;- index + 1
-        }
-        print(paste(&quot;n-grams removed&quot;, removed))
-    }
-    return(c(one_part, rev(ngram)))
-}
-
-# opt_tree &lt;- optFunc(threegram)
-# opt_model &lt;- lapply(model, optFunc) </code></pre>
+<p>Optimization is heavily dependant on the requirements for the final product. So we should describe how the final Web application is expected to perform. It have to contain text input form, where user may type the text. Data from this form is processed with predictive function that returns most probable next words using our n-gram models. It also might return more than one word, but some reasonable number of words to give a possibility to choose the right one by user itself. The goal of this application is to reduce the amount of typing, because it might be not very convenient on mobile devices. So giving 5 most probable next words to a user should be a reasonable number of words to choose from. Five items is not too many, and they could be easily showed at a mobile device screen.</p>
+<p>Taking to consideration provided description of the final product, we can think how our predictive models might be optimized. We do not require more than 5 predictions for each input text, so we can reduce the size of models by deleting all predictions beside the top-5 for each n-gram (without removing the punctuation marks, they will be treated separately by the predictive function), because they will never appear in predictions. So at the end we should have predictive models with no more than 5 predictions for each n-gram, plus any predictions of punctuation marks.</p>
+<p>Here you can see how the size of models reduced after the optimization:</p>
+<pre><code>## [1] &quot;Twitter model length before and after the optimization:&quot;</code></pre>
+<pre><code>##            before   after
+## bigram    1245413 1245413
+## threegram 2208647 2208647
+## fourgram  1312515 1312515</code></pre>
+<pre><code>## [1] &quot;Blogs model length before and after the optimization:&quot;</code></pre>
+<pre><code>##            before   after
+## bigram    1559656 1559656
+## threegram 2254311 2254311
+## fourgram  1271028 1271028</code></pre>
+<pre><code>## [1] &quot;News model length before and after the optimization:&quot;</code></pre>
+<pre><code>##            before   after
+## bigram    1560659 1560659
+## threegram 2061751 2061751
+## fourgram  1467307 1467307</code></pre>
+<p>Besides this, another optimization might be done to improve access to data. Next word prediction should be almost instantaneous in our App, because potential user will not be waiting for predictions for even small amount of time. Created n-gram models are still have many elements in them, and searching for the right one might take some time if we just try to access it as is. So we decided to make hashing of the models, grouping similar records by the first two characters in the n-gram, which makes access to data much more faster.</p>
 </div>
 <div id="predictive-function" class="section level3">
 <h3>Predictive Function</h3>
+<p>The predictive function uses n-gram models and indexes to predict the most probable next words. It produces a prediction that consists of at most 5 words.</p>
+<p>When argument clean=TRUE, it also perform text preprocessing before generating predictions (similar to the corpus cleaning during the model-creation process). At the cleaning stage all digits, e-mails and bad-words are replaced with coresponding tokens, and special characters are removed (except the meaningful punctuation marks “.,?.”), as well as excessive white-space characters. At the beginning of the text the special tag “&lt;s&gt;” is placed.</p>
+<p>The predicting part of this function use “backing-off” to the lower n models under conditions when the given model do not produce a good prediction. By doing so, the it produce the most reliable prediction using the best model. It use backing-of from 4 to 3 and 2-gram models.</p>
+<p>Smoothing wasn’t used for the models, because it produced less accurate predictions than just using simple “backing-off” without smoothing.</p>
+<p>Another feature of the particular predictive function is that it’s behaviour depends on the last character in the text. When there is a “space” at that position, it includes punctuation mark into results, so it also predicts those four important punctuations - “.,!?”.</p>
+<p>Lets try to predict the next words for the 4-grams from the phrase:</p>
+<p>“The alacrity of the brown fox contributes to its ability to perform a saltationary action over the lazy dog”</p>
+<pre><code>## [1] &quot;The alacrity of the&quot;
+## [1] &quot; most&quot;  &quot; world&quot; &quot; day&quot;   &quot; year&quot;  &quot; time&quot; 
+##    user  system elapsed 
+##    1.58    0.00    1.59 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;alacrity of the brown&quot;
+## [1] &quot; sugar&quot; &quot;,&quot;      &quot; ale&quot;   &quot; and&quot;  
+##    user  system elapsed 
+##    2.50    0.02    2.54 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;of the brown fox&quot;
+## [1] &quot; news&quot; &quot;,&quot;     &quot;.&quot;     &quot; and&quot;  &quot; is&quot;  
+##    user  system elapsed 
+##     1.7     0.0     1.7 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;the brown fox contributes&quot;
+## [1] &quot; to&quot;            &quot; a&quot;             &quot; more&quot;          &quot; an&quot;           
+## [5] &quot; significantly&quot;
+##    user  system elapsed 
+##    0.66    0.00    0.67 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;brown fox contributes to&quot;
+## [1] &quot; the&quot;  &quot; a&quot;    &quot; high&quot; &quot; it&quot;   &quot; nbc&quot; 
+##    user  system elapsed 
+##    0.74    0.00    0.75 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;fox contributes to its&quot;
+## [1] &quot; own&quot;      &quot; original&quot; &quot; name&quot;     &quot; former&quot;   &quot; knees&quot;   
+##    user  system elapsed 
+##    0.84    0.00    0.84 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;contributes to its ability&quot;
+## [1] &quot; to&quot; &quot; is&quot; &quot; of&quot;
+##    user  system elapsed 
+##    0.86    0.00    0.86 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;to its ability to&quot;
+## [1] &quot; produce&quot; &quot; wrap&quot;    &quot; make&quot;    &quot; be&quot;      &quot; do&quot;     
+##    user  system elapsed 
+##    0.61    0.00    0.61 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;its ability to perform&quot;
+## [1] &quot; the&quot; &quot; a&quot;   &quot;.&quot;    &quot; at&quot;  &quot;,&quot;   
+##    user  system elapsed 
+##    0.89    0.00    0.91 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;ability to perform a&quot;
+## [1] &quot; specific&quot; &quot; certain&quot;  &quot; free&quot;     &quot; few&quot;      &quot; little&quot;  
+##    user  system elapsed 
+##    0.93    0.00    0.93 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;to perform a saltationary&quot;
+## list()
+##    user  system elapsed 
+##    0.68    0.00    0.70 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;perform a saltationary action&quot;
+## [1] &quot;.&quot;    &quot;,&quot;    &quot; and&quot; &quot; is&quot;  &quot; in&quot; 
+##    user  system elapsed 
+##    0.55    0.00    0.57 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;a saltationary action over&quot;
+## [1] &quot; the&quot; &quot; and&quot; &quot; to&quot;  &quot; a&quot;   &quot;.&quot;   
+##    user  system elapsed 
+##    0.14    0.00    0.14 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;saltationary action over the&quot;
+## [1] &quot; years&quot; &quot; past&quot;  &quot; last&quot;  &quot; next&quot;  &quot; world&quot;
+##    user  system elapsed 
+##    0.95    0.00    0.95 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;action over the lazy&quot;
+## [1] &quot; days&quot;  &quot; eye&quot;   &quot;,&quot;      &quot; river&quot; &quot;.&quot;     
+##    user  system elapsed 
+##    2.25    0.00    2.29 
+## [1] &quot;----------------------------------------------------&quot;
+## [1] &quot;over the lazy dog&quot;
+## [1] &quot;.&quot;    &quot;,&quot;    &quot; and&quot; &quot; is&quot;  &quot; in&quot; 
+##    user  system elapsed 
+##     1.5     0.0     1.5 
+## [1] &quot;----------------------------------------------------&quot;</code></pre>
+<p>As we can see, the predictive function works, but to evaluate the accuracy of predictions, large scale accuracy tests should be performed. They will be described in more detail in the next segment of this report.</p>
 </div>
 <div id="performance-testing" class="section level3">
 <h3>Performance Testing</h3>
+<p>To calculate how well the models perform, we used the parts of files that was considered as the test sets, and which have not been used for the models creation:</p>
+<ol style="list-style-type: decimal">
+<li>en_US.twitter.txt - last 360,148 lines of the file</li>
+<li>en_US.blogs.txt - last 149,288 lines of the file</li>
+<li>en_US.news.txt - last 210,238 lines of the file</li>
+</ol>
+<p>To obtain the accuracy of the word prediction algorithm the following steps was performed:</p>
+<ol style="list-style-type: decimal">
+<li>4-grams and their counts was generated from test sets.</li>
+<li>There were randomly sampled 1000 4-grams from each set for testing.</li>
+<li>Each 4-gram was separated on the first 3 words (which were used for prediction) and a last word (to compare result with).</li>
+<li>The prediction of at most 5 words was generated using the predicting function, and the real last word from 4-gram was looked in vector with predictions. This produced True or False (1 or 0) prediction for each 4-gram.</li>
+<li>The results (0 or 1) for each particular 4-gram was multiplied by the counts for it. After doing this for all 4-grams, the counts for all 4-gram were summed and compared to their sum before running these tests. We did this because not every 4-gram have the same weight for our ability to predict, and their counts represents frequencies of them in the real data. So their counts were used as weights. For instance, 4-gram with count 100 will happen 100 times more frequently than 4-gram with count 1, and it also will be 100 times more valuable for prediction.</li>
+</ol>
+<p>Here are the results of prediction accuracy for all three models (models were tested in context of the data - twitter test set was used for the twitter model testing, etc.):</p>
+<pre><code>## [1] &quot;Word prediction accuracy for news n-gram model:&quot;
+## [1] 0.2814
+## [1] &quot;Word prediction accuracy for blogs n-gram model:&quot;
+## [1] 0.2612
+## [1] &quot;Word prediction accuracy for twitter n-gram model:&quot;
+## [1] 0.3352</code></pre>
 </div>
 </div>
 <div id="web-application" class="section level2">
 <h2>Web Application</h2>
+<p>Based on the obtained predictive function and optimized models, the demonstrational Web application was created. Here are some features of it’s functionality:</p>
+<ul>
+<li>It predicts the most probable next words using back-off n-gram model</li>
+<li>Prediction consists of 5 words or less to choose the right one by user</li>
+<li>The are possibility to choose one of three different modes of writing (twitter, news, blog) for different kinds of texts</li>
+<li>When user types just a part of word the application is trying to predict and complete the word</li>
+<li>While the application does not predict profane words, bad-words can be in the user’s text and they generally do not affect the the quality of the next words prediction</li>
+<li>App includes punctuation marks to prediction when the last character in the user’s text is not a “space” character</li>
+<li>The predictions are not affected by the proximity of the document start. App will try to predict the next word even if the document is empty</li>
+<li>It can predict words that follow after e-mails or digits. Also it predicts abbreviations like U.S., p.m. and others.</li>
+</ul>
+<p>The application can be accessed here: <a href>Under Development</a></p>
 </div>
 
 
