@@ -1,4 +1,4 @@
-# Building a Predictive Text Model for Words Prediction in Twitter, News, and Blogs Texts 
+# Building Predictive Text Models for Twitter, News, and Blogs Corpora 
 
 This is an educational Capstone Project, which is the part of [Data Science Specialization](https://www.coursera.org/specialization/jhudatascience/1?utm_medium=listingPage) provided by Johns Hopkins University on Coursera. 
 
