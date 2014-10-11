@@ -27,10 +27,12 @@ Note that the raw data contain words of offensive and profane meaning.
 
 ## Results
 
-You can explore reproducible R markdown document describing model building and testing process here:
+You can explore the report about project and the reproducible R markdown document describing model building and testing process here:
 
 [Report](http://htmlpreview.github.io/?https://github.com/HukoJack/Natural_Language_Processing_Project/blob/master/Report.html)
 
+[Reproducible Rmd](https://github.com/HukoJack/Natural_Language_Processing_Project/blob/master/Report.Rmd)
+
 You can have access to demonstrational Web application here:
 
-under construction
+[Under construction]()
