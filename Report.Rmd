@@ -1273,4 +1273,4 @@ Based on the obtained predictive function and optimized models, the demonstratio
 + It can predict words that follow after e-mails or digits. Also it predicts abbreviations like U.S., p.m. and others.
 
 The application can be accessed here:
-[Under Development]()
+[Word Prediction App](https://hukojack.shinyapps.io/Word_Prediction/)  It might take a few seconds for application to load.

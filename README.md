@@ -35,4 +35,4 @@ You can explore the report about project and the reproducible R markdown documen
 
 You can have access to demonstrational Web application here:
 
-[Under construction]()
+[Word Prediction App](https://hukojack.shinyapps.io/Word_Prediction/)  It might take a few seconds for application to load.
