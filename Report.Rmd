@@ -538,7 +538,7 @@ res <- data.frame(n.gram.size=size, row.names=names(size))
 res
 ```
 
-There are also some differences in the most common words frequencies:
+There are also some differences in the most common words frequencies. While the most frequent words are generally also "stop-words" as in the blogs and news data, twitter corpus contains many "bad-words".
 
 ```{r twitter_frequent_words, cache=TRUE, fig.height=4, fig.width=6, echo=FALSE}
 par(mfrow=c(1, 1))
@@ -550,10 +550,6 @@ par(mar=c(6, 5, 3, 0))
 barplot(head(gr1, 30), xlab="", ylab="Counts", col=col(30), las=2, ylim=c(0, 1200000),
         main="Most frequent words in twitter corpus", cex.axis=0.6)
 ```
-
-While the most frequent words are generally also "stop-words" as in the blogs and news data, twitter corpus contains many "bad-words".
-
-The most frequent n-grams are also differ significantly from the blogs and news corpora:
 
 ```{r twitter_grams,  cache=TRUE, fig.height=5, fig.width=7, echo=FALSE}
 par(mfrow=c(2, 2))
@@ -579,7 +575,7 @@ barplot(head(gram4, 20), xlab="", col=col(20), las=2, ylim=c(0, 20000),
         main="Counts of 4-grams in twitter corpus", cex.main=0.9)
 ```
 
-The most frequent 1 and 2-grams in the twitter corpus contain "\<s\>" tag that means start of the document. This is not surprising, because twits are usually short, and corpus from twitter will have more documents than a corpus of the same size with blogs or news. 
+Common n-grams are also differ significantly from the blogs and news corpora. The most frequent 1 and 2-grams in the twitter corpus contain "\<s\>" tag that means start of the document. This is not surprising, because twits are usually short, and corpus from twitter will have more documents than a corpus of the same size with blogs or news. 
 
 Another feature of the twitter data is that most frequent 3 and 4-grams generally contain word "thank". It is probably due to the fact that there are a lot of twits like "thanks for the follow", "thanks for the rt", etc. in the corpus.
 
@@ -610,7 +606,7 @@ barplot(head(gr1, 30), xlab="", ylab="Counts", col=col(30), las=2, ylim=c(0, 200
         main="Most frequent words in news corpus", cex.axis=0.6)
 ```
 
-There are different the most common 3 and 4 grams in the news corpus comparing to the other. They have a lot of digits and time abbreviations like "a . m .", "p . m ." or their combinations. There is also "u . s ." abbreviation frequent there as in the blogs corpus:
+The most common 3 and 4 grams are different in the news corpus comparing to the other. They have a lot of digits and time abbreviations like "a . m .", "p . m ." or their combinations. Also the "u . s ." abbreviation frequent there as in the blogs corpus.
 
 ```{r news_grams,  cache=TRUE, fig.height=5, fig.width=7, echo=FALSE}
 par(mfrow=c(2, 2))
@@ -638,9 +634,9 @@ barplot(head(gram4, 20), xlab="", col=col(20), las=2, ylim=c(0, 20000),
 
 ## Predictive Model
 
-### Probability model
+### Probabilistic model
 
-The n-gram counts were transformed into probabilities to have the last word in a n-gram given the previous words. For each n-gram this probability might be calculated as a count of the particular n-gram divided on a count of (n-1)-gram (the same n-gram but without the last word).
+The n-gram counts were transformed into probabilities to have the last word in a n-gram given the previous words. For each n-gram this probability might be calculated as a count of the particular n-gram divided on the count of (n-1)-gram (the same n-gram but without the last word).
 
 ```{r prob_model, echo=FALSE}
 getProbability <- function(counts, ngram_minus_one) {
@@ -755,7 +751,7 @@ After calculating probabilities for each n-gram, they were placed into the model
 
 ### Optimization
 
-Optimization is heavily dependant on the requirements for the final product. So we should describe how the final Web application is expected to work. It have to contain text input form, where user may type the text. Data from this form should be processed with predictive function that returns most probable next words using our n-gram model. It also might return more than one word, but some reasonable number of words to give a possibility to choose the right one by user itself. The goal of this application is to reduce the amount of typing, because it might be not very convenient on mobile devices. So giving 5 most probable next words to a user should be a reasonable number of words to choose from. Five items could be easily showed at a mobile device screen.
+Optimization is heavily dependant on the requirements for the final product. So we should describe how the final Web application is expected to work. It have to contain text input form, where user may type the text. Data from this form should be processed with predictive function that returns most probable next words using our n-gram model. It also might return more than one word, but some reasonable number of words to give a possibility to choose the right one by user itself. The goal of this application is to reduce the amount of typing, because it might be not very convenient process on mobile devices. So giving 5 the most probable next words to a user should be a reasonable number of words to choose from. Five items could be easily showed at a mobile device screen.
 
 Taking to consideration provided description of the final product, we can think how our predictive models might be optimized. We do not require more than 5 predictions for each input text, so we can reduce the size of models by deleting all predictions beside the top-5 for each n-gram (without removing the punctuation marks, they will be treated separately by the predictive function), because they will never appear in predictions. So at the end we should have predictive models with no more than 5 predictions for each n-gram, plus predictions of punctuation marks.
 
@@ -884,7 +880,7 @@ if (!(file.exists("twit.optimization.results") &
 }
 ```
 
-Besides this, another optimization might be done to improve access to data. Next word prediction should be almost instantaneous in our App, because potential user will not be waiting for predictions for even small amount of time. Created n-gram models are still have many elements in them, and searching for the right one might take some time if we will try to access data as is. So we decided to make hashing of the models by grouping similar records using the first two characters in each n-gram, which makes access to data much more faster.
+Besides this, another optimization might be done to improve access to the data. Next word prediction should be almost instantaneous in our App, because potential user will not be waiting for predictions for even small amount of time. Created n-gram models are still have many elements in them, and searching for the right one might take some time if we will try to access data as is. So we decided to make hashing of the models by grouping similar records by the first two characters in each n-gram, which makes access to data much more faster.
 
 ```{r indexing_func, echo=FALSE}
 makeIndex <- function(ngram) {
@@ -950,9 +946,9 @@ if (!all(file.exists("blogs.model.hashed", "news.model.hashed", "twitter.model.h
 
 The predictive function uses n-gram models and indexes to predict the most probable next words. It produces a prediction that consists of 5 words at most.
 
-When argument clean=TRUE, it also perform text preprocessing before generating predictions (similar to the corpus cleaning during the model-creation process). At the cleaning stage all digits, e-mails and bad-words are replaced with coresponding tokens, and special characters are removed (except the meaningful punctuation marks ".,?."), as well as excessive white-space characters. At the beginning of the text the special tag "\<s\>" is placed.
+When argument clean is TRUE, it also performs text preprocessing before generating predictions (similar to the corpus cleaning during the model-creation process). At the cleaning stage all digits, e-mails and bad-words are replaced with coresponding tokens, and special characters are removed (except the meaningful punctuation marks ".,?."), as well as excessive white-space characters. At the beginning of each document the special tag "\<s\>" is placed.
 
-The predicting part of this function uses "backing-off" to the lower n models under conditions when the given n-gram model do not produce a good prediction. By doing this, it produce the most reliable prediction using the best performing model. The backing-of in the function is from 4 to 3 and 2-gram models.
+The predicting part of this function uses "backing-off" to the lower n models under conditions when the given n-gram model do not produce a good prediction. By doing this, it returns the most reliable prediction using the best performing model. The backing-of in the function goes from 4 to 3 and 2-gram models.
 
 Smoothing wasn't used for the models, because during the tests it produced less accurate predictions than just using simple "backing-off" without smoothing.
 
@@ -1096,9 +1092,9 @@ for (gram4 in four_grams) {
 }
 ```
 
-As we can see, the predictive function works, but to evaluate the accuracy of it large scale accuracy tests should be performed. They will be described in more details in the next segment of this report.
+As we can see, the predictive function works, but to evaluate the accuracy of it a large scale accuracy test should be performed. It will be described in more details in the next segment of this report.
 
-### Performance Testing
+## Performance Testing
 
 To calculate how well the models perform, we used the parts of files that was considered as the test sets, and which have not been used for the models creation:
 
@@ -1106,13 +1102,13 @@ To calculate how well the models perform, we used the parts of files that was co
 2. en_US.blogs.txt - last 149,288 lines at the end of the file
 3. en_US.news.txt - last 210,238 lines at the end of the file
 
-To obtain the accuracy of the word prediction algorithm the following steps was performed:
+To obtain the accuracy of the word prediction algorithm the following steps were performed:
 
 1. 4-grams and their counts were generated from test sets.
 2. There were randomly sampled 1000 4-grams from each set for testing.
 3. Each 4-gram was separated on the first 3 words (which were used for prediction) and a last word (to compare result with).
-4. The prediction of at most 5 words was generated using the predicting function, and the real last word from 4-gram was searched in vector with predictions. This produced True or False (1 or 0) prediction for each 4-gram.
-5. The results (0 or 1) for each particular 4-gram was multiplied by the counts for it. After doing this for all 4-grams, the counts for all 4-gram were summed and compared to their sum before running these tests. We did this because not every 4-gram have the same weight for our ability to predict, and their counts represents frequencies of them in the real data. So their counts were used as weights. For instance, 4-gram with count 100 will happen 100 times more frequently than 4-gram with count 1, and it also will be 100 times more valuable for prediction.
+4. The prediction of at most 5 words was generated using the predicting function, and the real last word from 4-gram was searched in vector with predictions. This produced True or False (1 or 0) result for each 4-gram.
+5. The results (0 or 1) for each particular 4-gram was multiplied by the counts of it. After doing this for all 4-grams, their counts were summed and compared to sum before running these tests. We did this because not every 4-gram have the same weight for our ability to predict, and their counts represents frequencies of them in the real data. So counts were used as weights. For instance, a 4-gram with count 100 will happen 100 times more frequently than a 4-gram with count 1, and it at the same time will be 100 times more valuable for prediction.
 
 Here are the results of prediction accuracy for all three models (models were tested in context of the data - twitter test set was used for the twitter model testing, etc.):
 
@@ -1263,11 +1259,11 @@ if (!all(file.exists("testing.twitter", "testing.news", "testing.blogs"))) {
 
 Based on the obtained predictive function and optimized models, the demonstrational Web application was created. Here are some features of it's functionality:
 
-+ It predicts the most probable next words using back-off n-gram model
++ It predicts the most probable next words using backing-off n-gram model
 + Prediction consists of 5 words or less to choose the right one by user itself
-+ The are possibility to choose one of three different modes for prediction (twitter, news, blog) for different kinds of texts 
-+ When user types just a part of word the application is trying to predict the rest of the word
-+ While the application does not predict profane words, bad-words can be in the user's text and they do not affect the quality of prediction
++ The are three different modes for predicting (twitter, news, blog) for different kinds of texts 
++ When user types just a part of a word the application is trying to predict the rest of it
++ While the application does not predict profane words, they still can be in the user's text and this does not affect the quality of prediction
 + App includes punctuation marks into prediction results when the last character in the user's text is not a "space" character
 + The predictions are not affected by the proximity of the document start. App will try to predict the next word even if the document is empty
 + It can predict words that follow after e-mails or digits. Also it predicts abbreviations like U.S., p.m. and others.
