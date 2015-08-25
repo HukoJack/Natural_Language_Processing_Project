@@ -1,6 +1,6 @@
 # Building Predictive Text Models for Twitter, News, and Blogs Corpora 
 
-This is an educational Capstone Project, which is the part of [Data Science Specialization](https://www.coursera.org/specialization/jhudatascience/1?utm_medium=listingPage) provided by Johns Hopkins University on Coursera. 
+This is an educational Capstone Project,that is the part of [Data Science Specialization](https://www.coursera.org/specialization/jhudatascience/1?utm_medium=listingPage) provided by Johns Hopkins University on Coursera. 
 
 ## Introduction
 
@@ -33,6 +33,6 @@ You can explore the report about project and the reproducible R markdown documen
 
 [Reproducible Rmd](https://github.com/HukoJack/Natural_Language_Processing_Project/blob/master/Report.Rmd)
 
-You can have access to demonstrational Web application here:
+You can have access to the demonstrational Web application here:
 
 [Word Prediction App](https://hukojack.shinyapps.io/Word_Prediction/)  It might take a few seconds for application to load.
